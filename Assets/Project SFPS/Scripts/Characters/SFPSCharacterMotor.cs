@@ -20,7 +20,7 @@ namespace ProjectSFPS.Characters
 
         private Rigidbody _rigidbody = null;
 
-        private void Awake()
+        protected override void Initialize()
         {
             Log("Initialize Character Motor");
 
@@ -49,13 +49,15 @@ namespace ProjectSFPS.Characters
             _rigidbody.AddForce(velocityChange, ForceMode.Impulse);
         }
 
-        public void Rotate(float horizontal)
+        public void Rotate(float horizontal, float vertical)
         {
             // Calculate rotation.
             Vector3 rot = transform.rotation.eulerAngles;
             rot = new Vector3(
                 0.0f,
-                rot.y + (horizontal * m_TurnSensitivity.Value.x),
+                // rot.y + (horizontal * m_TurnSensitivity.Value.x),
+                // rot.y,
+                horizontal,
                 0.0f
             );
 

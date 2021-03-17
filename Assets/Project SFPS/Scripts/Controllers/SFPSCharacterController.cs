@@ -1,30 +1,29 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+using ProjectSFPS.Cameras;
+using ProjectSFPS.Characters;
 using ProjectSFPS.Core.Input;
 using ProjectSFPS.Core.Variables;
 
-namespace ProjectSFPS.Characters
+namespace ProjectSFPS.Controllers
 {
     [RequireComponent(typeof(SFPSUserInput))]
-    public class SFPSCharacter : SFPSBehaviour
+    public class SFPSCharacterController : SFPSBehaviour
     {
         [Header("Input Actions")]
         [SerializeField]
         private SFPSStringReference m_MoveAction = "Move";
-        [SerializeField]
-        private SFPSStringReference m_LookAction = "Look";
 
-        private InputAction m_MoveInputAction = null;
-        private InputAction m_LookInputAction = null;
-
+        private SFPSBaseCamera m_Camera = null;
         private SFPSUserInput m_UserInput = null;
         private SFPSCharacterMotor m_CharacterMotor = null;
 
-        private Vector2 m_CurrentLookInput = Vector2.zero;
+        private InputAction m_MoveInputAction = null;
+
         private Vector2 m_CurrentMoveInput = Vector2.zero;
 
-        private void Awake()
+        protected override void Initialize()
         {
             Log("Initialize Character");
 
@@ -41,18 +40,10 @@ namespace ProjectSFPS.Characters
             m_MoveInputAction = m_UserInput.GetAction(m_MoveAction);
             if (m_MoveInputAction == null)
                 LogError("InputAction [" + m_MoveAction + "] not found. Movement input will be ignored on [" + name + "].");
-
-            // Look input action.
-            m_LookInputAction = m_UserInput.GetAction(m_LookAction);
-            if (m_LookInputAction == null)
-                LogError("InputAction [" + m_LookAction + "] not found. Rotation input will be ignored on [" + name + "].");
         }
 
         private void ReadInput()
         {
-            if (m_LookInputAction != null)
-                m_CurrentLookInput = m_LookInputAction.ReadValue<Vector2>();
-
             if (m_MoveInputAction != null)
                 m_CurrentMoveInput = m_MoveInputAction.ReadValue<Vector2>();
         }
@@ -62,13 +53,18 @@ namespace ProjectSFPS.Characters
             ReadInput();
 
             if (m_CharacterMotor != null)
-                m_CharacterMotor.Rotate(m_CurrentLookInput.x);
+                m_CharacterMotor.Rotate(m_Camera.transform.rotation.eulerAngles.y, 0.0f);
         }
 
         private void FixedUpdate()
         {
             if (m_CharacterMotor != null)
                 m_CharacterMotor.Move(m_CurrentMoveInput.x, m_CurrentMoveInput.y);
+        }
+
+        public void SetCamera(SFPSBaseCamera camera)
+        {
+            m_Camera = camera;
         }
     }
 }

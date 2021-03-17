@@ -48,7 +48,7 @@ namespace ProjectSFPS.Core.Utility
             }
         }
 
-        protected virtual void Awake()
+        protected override void Initialize()
         {
             lock (m_Lock)
             {

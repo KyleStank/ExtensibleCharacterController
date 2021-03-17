@@ -5,7 +5,7 @@ using ProjectSFPS.Core.Variables;
 
 namespace ProjectSFPS.Core.Input
 {
-    public class SFPSUserInput : SFPSBehaviour
+    public sealed class SFPSUserInput : SFPSBehaviour
     {
         [Header("References")]
         [SerializeField]
@@ -21,7 +21,7 @@ namespace ProjectSFPS.Core.Input
             get { return m_ActiveActionMap; }
         }
 
-        private void Awake()
+        protected override void Initialize()
         {
             TrySetActiveActionMap(m_DefaultActionMap);
         }

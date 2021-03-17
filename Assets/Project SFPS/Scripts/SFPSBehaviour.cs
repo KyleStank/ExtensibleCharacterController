@@ -24,7 +24,13 @@ namespace ProjectSFPS
             set { m_LoggingEnabled = value; }
         }
 
-        private string FormatLogMessage(object message)
+        protected virtual void Awake() => Initialize();
+
+        protected abstract void Initialize();
+
+        #region Logging Methods
+
+        protected string FormatLogMessage(object message)
         {
             return "[SFPS]: " + message;
         }
@@ -49,5 +55,7 @@ namespace ProjectSFPS
 
             Debug.LogError(FormatLogMessage(message), context == null ? this : context);
         }
+
+        #endregion
     }
 }

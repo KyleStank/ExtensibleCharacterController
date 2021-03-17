@@ -247,7 +247,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 6384343835097644697}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 718540d7af559c24d8a2a2007a92618c, type: 3}
+  m_Script: {fileID: 11500000, guid: 97d46753404c8044e888f896e9351739, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   m_ShowBaseProps:
@@ -265,10 +265,6 @@ MonoBehaviour:
   m_MoveAction:
     m_UseConstantValue: 1
     m_ConstantValue: Move
-    m_Variable: {fileID: 0}
-  m_LookAction:
-    m_UseConstantValue: 1
-    m_ConstantValue: Look
     m_Variable: {fileID: 0}
 --- !u!114 &8412452742463804680
 MonoBehaviour:

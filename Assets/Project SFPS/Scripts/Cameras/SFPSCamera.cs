@@ -4,8 +4,7 @@ using ProjectSFPS.Core.Variables;
 
 namespace ProjectSFPS.Cameras
 {
-    [RequireComponent(typeof(Camera))]
-    public class SFPSCamera : SFPSBehaviour
+    public class SFPSCamera : SFPSBaseCamera
     {
         [Header("Camera Settings")]
         [SerializeField]
@@ -17,26 +16,12 @@ namespace ProjectSFPS.Cameras
         private SFPSFloatReference m_TopClamp = -65.0f;
         [SerializeField]
         private SFPSFloatReference m_BottomClamp = 65.0f;
+        [SerializeField]
+        private SFPSBoolReference m_EnableSmoothing = false;
+        [SerializeField]
+        private SFPSFloatReference m_RotationSpeed = 10.0f;
 
-        private Camera m_Camera = null;
-        private Transform m_Target = null;
-        private Quaternion m_OriginalRotation = Quaternion.identity;
-
-        private void Awake()
-        {
-            Log("Initialize Camera");
-
-            m_Camera = GetComponent<Camera>();
-
-            m_OriginalRotation = transform.rotation;
-        }
-
-        public void SetTarget(Transform target)
-        {
-            m_Target = target;
-        }
-
-        public void Move()
+        public override void UpdatePosition(float xAxis, float yAxis, float zAxis)
         {
             if (m_Target == null)
             {
@@ -47,31 +32,33 @@ namespace ProjectSFPS.Cameras
             transform.position = m_Target.position + m_Target.TransformDirection(m_Offset);
         }
 
-        public void Rotate(float horizontal, float vertical)
+        public override void UpdateRotation(float xEuler, float yEuler, float zEuler)
         {
-            // Detect input.
-            Quaternion rot = transform.rotation;
-            if (horizontal != 0 || vertical != 0)
-            {
-                Vector3 eulerAngles = rot.eulerAngles;
+            Quaternion rot = m_NextRotation;
+            Vector3 eulerAngles = rot.eulerAngles;
 
-                // Calculate rotation.
-                float xRot = eulerAngles.x - vertical * m_Sensitivity.Value.y;
-                float yRot = eulerAngles.y + horizontal * m_Sensitivity.Value.x;
-                rot = Quaternion.Euler(
-                    new Vector3(
-                        Mathf.Clamp(
-                            xRot > 180.0f ? xRot - 360 : xRot,
-                            m_TopClamp,
-                            m_BottomClamp
-                        ),
-                        yRot,
-                        m_OriginalRotation.z
-                    )
-                );
-            }
+            float xRot = eulerAngles.x - xEuler * m_Sensitivity.Value.y;
+            float yRot = eulerAngles.y + yEuler * m_Sensitivity.Value.x;
+            rot = Quaternion.Euler(
+                new Vector3(
+                    Mathf.Clamp(
+                        xRot > 180.0f ? xRot - 360.0f : xRot,
+                        m_TopClamp,
+                        m_BottomClamp
+                    ),
+                    yRot,
+                    m_NextRotation.z
+                )
+            );
 
-            transform.rotation = rot;
+            m_NextRotation = rot;
+        }
+
+        public override void ApplyRotation()
+        {
+            transform.rotation = m_EnableSmoothing ?
+                Quaternion.Lerp(transform.rotation, m_NextRotation, Time.deltaTime * m_RotationSpeed) :
+                m_NextRotation;
         }
     }
 }
