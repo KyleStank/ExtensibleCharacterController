@@ -167,9 +167,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6384343835097644696}
   - component: {fileID: 3544393312556234890}
-  - component: {fileID: 6109095390562605957}
-  - component: {fileID: 5699086164532917130}
-  - component: {fileID: 509191560479066514}
+  - component: {fileID: 981053967095312733}
   m_Layer: 0
   m_Name: Character
   m_TagString: Player
@@ -209,7 +207,7 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 112
   m_CollisionDetection: 0
---- !u!114 &6109095390562605957
+--- !u!114 &981053967095312733
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -218,7 +216,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 6384343835097644697}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9ca291e573e8c354fb68e404ed47dc42, type: 3}
+  m_Script: {fileID: 11500000, guid: 910489d9b16d3ab498de3bcd4c30b232, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   m_ShowBaseProps:
@@ -233,68 +231,5 @@ MonoBehaviour:
     m_UseConstantValue: 1
     m_ConstantValue: 1
     m_Variable: {fileID: 0}
-  m_InputSettings: {fileID: 11400000, guid: b8279eb7ffbc8b1488f09a311b3b0393, type: 2}
-  m_DefaultActionMap:
-    m_UseConstantValue: 1
-    m_ConstantValue: Player
-    m_Variable: {fileID: 0}
---- !u!114 &5699086164532917130
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6384343835097644697}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cb5f11a7dbcce37408df0096de64a4df, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_ShowBaseProps:
-    m_UseConstantValue: 1
-    m_ConstantValue: 0
-    m_Variable: {fileID: 0}
-  m_ShowDerivedProps:
-    m_UseConstantValue: 1
-    m_ConstantValue: 0
-    m_Variable: {fileID: 0}
-  m_LoggingEnabled:
-    m_UseConstantValue: 1
-    m_ConstantValue: 1
-    m_Variable: {fileID: 0}
-  m_MoveAction:
-    m_UseConstantValue: 1
-    m_ConstantValue: Move
-    m_Variable: {fileID: 0}
---- !u!114 &509191560479066514
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6384343835097644697}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5281236e51c0ce94887f86b867035502, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_ShowBaseProps:
-    m_UseConstantValue: 1
-    m_ConstantValue: 0
-    m_Variable: {fileID: 0}
-  m_ShowDerivedProps:
-    m_UseConstantValue: 1
-    m_ConstantValue: 0
-    m_Variable: {fileID: 0}
-  m_LoggingEnabled:
-    m_UseConstantValue: 1
-    m_ConstantValue: 1
-    m_Variable: {fileID: 0}
-  _accelerationRate:
-    m_UseConstantValue: 1
-    m_ConstantValue: 10
-    m_Variable: {fileID: 0}
-  m_TurnSensitivity:
-    m_UseConstantValue: 0
-    m_ConstantValue: {x: 5, y: 5}
-    m_Variable: {fileID: 11400000, guid: 988752fe69132aa4dbc6dd344484a007, type: 2}
+  m_CharacterBehaviourNames:
+  - ECCTestBehaviour

@@ -1,3 +1,5 @@
+using UnityEngine;
+
 using UnityEditor;
 using UnityEditor.AnimatedValues;
 
@@ -66,13 +68,11 @@ namespace ExtensibleCharacterController.Editor.Inspectors
         /// </summary>
         private void DrawBaseProperties()
         {
-            // Create foldout.
-            m_PropShowBaseProps.isExpanded = EditorGUILayout.BeginFoldoutHeaderGroup(
-                m_PropShowBaseProps.isExpanded,
-                "ECCBehaviour Settings",
-                EditorStyles.foldoutHeader
-            );
-            m_BasePropsAnim.target = m_PropShowBaseProps.isExpanded;
+            if (GUILayout.Button("Base Settings"))
+            {
+                m_PropShowBaseProps.isExpanded = !m_PropShowBaseProps.isExpanded;
+                m_BasePropsAnim.target = m_PropShowBaseProps.isExpanded;
+            }
 
             // Fade foldout content in/out.
             if (EditorGUILayout.BeginFadeGroup(m_BasePropsAnim.faded))
@@ -86,7 +86,6 @@ namespace ExtensibleCharacterController.Editor.Inspectors
             }
 
             EditorGUILayout.EndFadeGroup();
-            EditorGUILayout.EndFoldoutHeaderGroup();
         }
 
         /// <summary>
@@ -94,13 +93,11 @@ namespace ExtensibleCharacterController.Editor.Inspectors
         /// </summary>
         private void DrawDerivedProperties()
         {
-            // Create foldout.
-            m_PropShowDerivedProps.isExpanded = EditorGUILayout.BeginFoldoutHeaderGroup(
-                m_PropShowDerivedProps.isExpanded,
-                m_TypeName + " Settings",
-                EditorStyles.foldoutHeader
-            );
-            m_DerivedPropsAnim.target = m_PropShowDerivedProps.isExpanded;
+            if (GUILayout.Button(m_TypeName + " Settings"))
+            {
+                m_PropShowDerivedProps.isExpanded = !m_PropShowDerivedProps.isExpanded;
+                m_DerivedPropsAnim.target = m_PropShowDerivedProps.isExpanded;
+            }
 
             // Fade foldout content in/out.
             if (EditorGUILayout.BeginFadeGroup(m_DerivedPropsAnim.faded))
@@ -113,7 +110,6 @@ namespace ExtensibleCharacterController.Editor.Inspectors
             }
 
             EditorGUILayout.EndFadeGroup();
-            EditorGUILayout.EndFoldoutHeaderGroup();
         }
     }
 }
