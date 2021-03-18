@@ -24,21 +24,21 @@ namespace ExtensibleCharacterController.Controllers
 
         protected override void Initialize()
         {
-            // Log("Initialize Character");
+            Log("Initialize Character");
 
-            // m_UserInput = GetComponent<ECCUserInput>();
-            // m_CharacterMotor = GetComponent<ECCCharacterMotor>();
+            m_UserInput = GetComponent<ECCUserInput>();
+            m_CharacterMotor = GetComponent<ECCCharacterMotor>();
 
-            // if (m_CharacterMotor == null)
-            //     LogWarning("Character movement and rotation will not be processed because no CharacterMotor is attached");
+            if (m_CharacterMotor == null)
+                LogWarning("Character movement and rotation will not be processed because no CharacterMotor is attached");
         }
 
         private void Start()
         {
-            // // Move input action.
-            // m_MoveInputAction = m_UserInput.GetAction(m_MoveAction);
-            // if (m_MoveInputAction == null)
-            //     LogError("InputAction [" + m_MoveAction + "] not found. Movement input will be ignored on [" + name + "].");
+            // Move input action.
+            m_MoveInputAction = m_UserInput.GetAction(m_MoveAction);
+            if (m_MoveInputAction == null)
+                LogError("InputAction [" + m_MoveAction + "] not found. Movement input will be ignored on [" + name + "].");
         }
 
         private void ReadInput()
@@ -49,16 +49,16 @@ namespace ExtensibleCharacterController.Controllers
 
         private void Update()
         {
-            // ReadInput();
+            ReadInput();
 
-            // if (m_CharacterMotor != null)
-            //     m_CharacterMotor.Rotate(m_Camera.transform.rotation.eulerAngles.y, 0.0f);
+            if (m_CharacterMotor != null)
+                m_CharacterMotor.Rotate(m_Camera.transform.rotation.eulerAngles.y, 0.0f);
         }
 
         private void FixedUpdate()
         {
-            // if (m_CharacterMotor != null)
-            //     m_CharacterMotor.Move(m_CurrentMoveInput.x, m_CurrentMoveInput.y);
+            if (m_CharacterMotor != null)
+                m_CharacterMotor.Move(m_CurrentMoveInput.x, m_CurrentMoveInput.y);
         }
 
         public void SetCamera(ECCBaseCamera camera)
