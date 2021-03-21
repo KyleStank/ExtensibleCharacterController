@@ -10,8 +10,12 @@ namespace ExtensibleCharacterController.Core.Variables
         public static implicit operator float(ECCFloatReference value) => value == null ? new ECCFloatReference().Value : value.Value;
 
         public static ECCFloatReference operator +(ECCFloatReference first, ECCFloatReference second) => first.Value + second.Value;
+        public static ECCFloatReference operator +(float first, ECCFloatReference second) => first + second.Value;
         public static ECCFloatReference operator -(ECCFloatReference first, ECCFloatReference second) => first.Value - second.Value;
+        public static ECCFloatReference operator -(float first, ECCFloatReference second) => first - second.Value;
         public static ECCFloatReference operator *(ECCFloatReference first, ECCFloatReference second) => first.Value * second.Value;
+        public static ECCFloatReference operator *(float first, ECCFloatReference second) => first * second.Value;
         public static ECCFloatReference operator /(ECCFloatReference first, ECCFloatReference second) => first.Value / second.Value;
+        public static ECCFloatReference operator /(float first, ECCFloatReference second) => first / second.Value;
     }
 }

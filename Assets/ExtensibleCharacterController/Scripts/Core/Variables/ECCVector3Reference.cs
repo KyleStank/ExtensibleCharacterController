@@ -12,6 +12,8 @@ namespace ExtensibleCharacterController.Core.Variables
         public static implicit operator Vector3(ECCVector3Reference value) => value == null ? new ECCVector3Reference().Value : value.Value;
 
         public static ECCVector3Reference operator +(ECCVector3Reference first, ECCVector3Reference second) => first.Value + second.Value;
+        public static ECCVector3Reference operator +(Vector3 first, ECCVector3Reference second) => first + second.Value;
         public static ECCVector3Reference operator -(ECCVector3Reference first, ECCVector3Reference second) => first.Value - second.Value;
+        public static ECCVector3Reference operator -(Vector3 first, ECCVector3Reference second) => first - second.Value;
     }
 }

@@ -77,12 +77,8 @@ namespace ExtensibleCharacterController.Editor.Inspectors
             // Fade foldout content in/out.
             if (EditorGUILayout.BeginFadeGroup(m_BasePropsAnim.faded))
             {
-                EditorGUI.indentLevel++;
-
                 // Logging property.
                 EditorGUILayout.PropertyField(m_PropLoggingEnabled);
-
-                EditorGUI.indentLevel--;
             }
 
             EditorGUILayout.EndFadeGroup();
@@ -102,11 +98,7 @@ namespace ExtensibleCharacterController.Editor.Inspectors
             // Fade foldout content in/out.
             if (EditorGUILayout.BeginFadeGroup(m_DerivedPropsAnim.faded))
             {
-                EditorGUI.indentLevel++;
-
                 DrawDefaultProperties();
-
-                EditorGUI.indentLevel--;
             }
 
             EditorGUILayout.EndFadeGroup();
