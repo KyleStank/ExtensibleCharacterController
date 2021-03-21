@@ -11,15 +11,13 @@ namespace ExtensibleCharacterController.Characters
     [RequireComponent(typeof(Rigidbody))]
     public class ECCCharacter : ECCBehaviour
     {
-        [Header("Behaviours")]
-        [SerializeField]
-        private List<string> m_CharacterBehaviourNames = new List<string>();
-
-        [Header("Character Settings")]
+        [Header("Generic Settings")]
         [SerializeField]
         private LayerMask m_CharacterLayer;
         [SerializeField]
         private ECCBoolReference m_UseGravity = true;
+        [SerializeField]
+        private ECCFloatReference m_Gravity = -Physics.gravity.y;
 
         // TODO: Move ground checking to a custom behaviour?
         [Header("Ground Settings")]
@@ -30,6 +28,10 @@ namespace ExtensibleCharacterController.Characters
 
         [SerializeField]
         private ECCFloatReference m_GroundDistance = 1.0f;
+
+        [Header("Behaviours")]
+        [SerializeField]
+        private List<string> m_CharacterBehaviourNames = new List<string>();
 
         private List<ECCBaseCharacterBehaviour> m_CharacterBehaviours = new List<ECCBaseCharacterBehaviour>();
 
@@ -116,31 +118,46 @@ namespace ExtensibleCharacterController.Characters
             m_Rigidbody.isKinematic = true;
         }
 
+        float horizontal;
+        float vertical;
         private void Update()
         {
-            // GetGroundCheckPosition(m_Rigidbody.position);
+            // TODO: Test input. Move elsewhere sometime.
+            horizontal = Input.GetAxis("Horizontal");
+            vertical = Input.GetAxis("Vertical");
         }
 
         private void FixedUpdate()
         {
             Vector3 updatePosition = m_Rigidbody.position;
-            updatePosition = m_UseGravity ? GetGravityPosition(updatePosition, -transform.up) : updatePosition;
+            m_IsGrounded = CheckForGround(updatePosition);
 
+            // Apply all required calculations to next position.
+            updatePosition = m_UseGravity ? GetGravityPosition(updatePosition, -Vector3.up) : updatePosition;
             updatePosition = GetGroundCheckPosition(updatePosition);
 
+            // TODO: Test movement. Move elsewhere sometime.
+            Vector3 input = new Vector3(horizontal, 0.0f, vertical);
+            updatePosition += (input * 5.0f) * Time.fixedDeltaTime;
+
+            // Apply new updated position.
             m_UpdatePosition = updatePosition;
             m_Rigidbody.MovePosition(m_UpdatePosition);
         }
 
         private Vector3 GetGravityPosition(Vector3 position, Vector3 direction)
         {
-            float gravity = -Physics.gravity.y;
-            return position + (direction * gravity * Time.fixedDeltaTime);
+            return position + (direction * m_Gravity * Time.fixedDeltaTime);
+        }
+
+        private bool CheckForGround(Vector3 position)
+        {
+            return Physics.CheckSphere(position + transform.TransformDirection(m_GroundOffset), m_GroundRadius, ~m_CharacterLayer.value);
         }
 
         private Vector3 GetGroundCheckPosition(Vector3 position)
         {
-            Vector3 sphereCastOffset = position + transform.up; // Offseting the Y index by a value of 1 should be fine in most cases.
+            Vector3 sphereCastOffset = position + transform.up;
             RaycastHit hit;
             if (Physics.SphereCast(sphereCastOffset, m_GroundRadius, -transform.up, out hit, m_GroundDistance, ~m_CharacterLayer.value))
             {
@@ -153,11 +170,42 @@ namespace ExtensibleCharacterController.Characters
         private void OnDrawGizmos()
         {
             Color color = Gizmos.color;
+            Matrix4x4 matrix = Gizmos.matrix;
 
             // Sphere for ground check.
-            Gizmos.color = Color.blue;
-            Vector3 groundedSphereStart = (m_Rigidbody ? m_Rigidbody.position : transform.position) + m_GroundOffset;
+            Gizmos.color = Color.green;
+            Vector3 groundedSphereStart = (m_Rigidbody ? m_Rigidbody.position : transform.position) + transform.TransformDirection(m_GroundOffset);
+            // Gizmos.matrix = transform.localToWorldMatrix;
+            // Vector3 groundedSphereStart = m_GroundOffset; // Use with transform.localToWorldMatrix.
             Gizmos.DrawWireSphere(groundedSphereStart, m_GroundRadius);
+
+            // TODO: Testing Physics.ComputePenetration().
+            // Collider self = GetComponentInChildren<Collider>();
+            // Collider[] cols = Physics.OverlapSphere(groundedSphereStart, m_GroundRadius, ~m_CharacterLayer.value);
+            // Gizmos.DrawWireSphere(groundedSphereStart, m_GroundRadius);
+            // for (int i = 0; i < cols.Length; i++)
+            // {
+            //     Collider col = cols[i];
+            //     Vector3 dir = Vector3.zero;
+            //     float dis = 0.0f;
+
+            //     // Debug.Log(col.name);
+            //     // Debug.Log(col.transform.position);
+
+            //     bool overlapped = Physics.ComputePenetration(
+            //         self, transform.position, transform.rotation,
+            //         col, col.transform.position, col.transform.rotation,
+            //         out dir, out dis
+            //     );
+
+            //     if (overlapped)
+            //     {
+            //         Debug.Log(dis);
+            //         // Debug.Log(dir);
+            //         Gizmos.color = Color.red;
+            //         Gizmos.DrawRay(transform.position, dir * dis);
+            //     }
+            // }
 
             // SphereCast for specific ground check.
             Vector3 groundedRayStart = (m_Rigidbody ? m_Rigidbody.position : transform.position) + transform.up;
@@ -172,13 +220,9 @@ namespace ExtensibleCharacterController.Characters
                 // Gizmos.DrawLine(hit.point, hit.transform.forward * 2.5f);
                 Gizmos.DrawLine(hit.normal, hit.normal * 2);
             }
-            else
-            {
-                Gizmos.color = Color.green;
-                Gizmos.DrawWireSphere(groundedRayStart + -transform.up * m_GroundDistance, m_GroundRadius);
-            }
 
             Gizmos.color = color;
+            Gizmos.matrix = matrix;
         }
     }
 }

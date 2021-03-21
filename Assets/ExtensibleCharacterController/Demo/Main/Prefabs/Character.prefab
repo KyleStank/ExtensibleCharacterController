@@ -231,8 +231,6 @@ MonoBehaviour:
     m_UseConstantValue: 1
     m_ConstantValue: 1
     m_Variable: {fileID: 0}
-  m_CharacterBehaviourNames:
-  - ECCMovementBehaviour
   m_CharacterLayer:
     serializedVersion: 2
     m_Bits: 2147483648
@@ -240,15 +238,21 @@ MonoBehaviour:
     m_UseConstantValue: 1
     m_ConstantValue: 1
     m_Variable: {fileID: 0}
+  m_Gravity:
+    m_UseConstantValue: 1
+    m_ConstantValue: 9.81
+    m_Variable: {fileID: 0}
   m_GroundRadius:
     m_UseConstantValue: 1
-    m_ConstantValue: 0.5
+    m_ConstantValue: 0.6
     m_Variable: {fileID: 0}
   m_GroundOffset:
     m_UseConstantValue: 1
-    m_ConstantValue: {x: 0, y: 0.39, z: 0}
+    m_ConstantValue: {x: 0, y: 0.5, z: 0}
     m_Variable: {fileID: 0}
   m_GroundDistance:
     m_UseConstantValue: 1
     m_ConstantValue: 1
     m_Variable: {fileID: 0}
+  m_CharacterBehaviourNames:
+  - ECCMovementBehaviour
