@@ -152,6 +152,7 @@ namespace ExtensibleCharacterController.Characters
 
         private bool CheckForGround(Vector3 position)
         {
+            // TransformDirection() accounts for rotations.
             return Physics.CheckSphere(position + transform.TransformDirection(m_GroundOffset), m_GroundRadius, ~m_CharacterLayer.value);
         }
 
@@ -162,6 +163,33 @@ namespace ExtensibleCharacterController.Characters
             if (Physics.SphereCast(sphereCastOffset, m_GroundRadius, -transform.up, out hit, m_GroundDistance, ~m_CharacterLayer.value))
             {
                 position.y = hit.point.y;
+
+                CapsuleCollider selfCollider = GetComponentInChildren<CapsuleCollider>();
+                Collider hitCollider = hit.collider;
+
+                Vector3 normal = Vector3.zero;
+                float distance = 0.0f;
+                bool overlapped = Physics.ComputePenetration(
+                    selfCollider, selfCollider.transform.position, selfCollider.transform.rotation,
+                    hitCollider, hitCollider.transform.position, hitCollider.transform.rotation,
+                    out normal, out distance
+                );
+
+                // TODO: Figure out how to use a combination of ComputePenetration(), ClosestPoint(), and hit.point to adjust positions.
+                // Vector3 closestPoint = transform.InverseTransformPoint(selfCollider.ClosestPoint(hit.point));
+                // Debug.Log(closestPoint);
+                // position += transform.InverseTransformPoint(hit.point) - closestPoint;
+                // position += hit.point - selfCollider.ClosestPoint(hit.point);
+                if (overlapped)
+                {
+                    // Vector3 posCorrection = normal * distance;
+                    // transform.position += posCorrection;
+                }
+                else
+                {
+                    // position += transform.InverseTransformPoint(hit.point) * hit.distance;
+                    // Debug.Log(hit.distance);
+                }
             }
 
             return position;
@@ -170,42 +198,11 @@ namespace ExtensibleCharacterController.Characters
         private void OnDrawGizmos()
         {
             Color color = Gizmos.color;
-            Matrix4x4 matrix = Gizmos.matrix;
 
             // Sphere for ground check.
             Gizmos.color = Color.green;
             Vector3 groundedSphereStart = (m_Rigidbody ? m_Rigidbody.position : transform.position) + transform.TransformDirection(m_GroundOffset);
-            // Gizmos.matrix = transform.localToWorldMatrix;
-            // Vector3 groundedSphereStart = m_GroundOffset; // Use with transform.localToWorldMatrix.
             Gizmos.DrawWireSphere(groundedSphereStart, m_GroundRadius);
-
-            // TODO: Testing Physics.ComputePenetration().
-            // Collider self = GetComponentInChildren<Collider>();
-            // Collider[] cols = Physics.OverlapSphere(groundedSphereStart, m_GroundRadius, ~m_CharacterLayer.value);
-            // Gizmos.DrawWireSphere(groundedSphereStart, m_GroundRadius);
-            // for (int i = 0; i < cols.Length; i++)
-            // {
-            //     Collider col = cols[i];
-            //     Vector3 dir = Vector3.zero;
-            //     float dis = 0.0f;
-
-            //     // Debug.Log(col.name);
-            //     // Debug.Log(col.transform.position);
-
-            //     bool overlapped = Physics.ComputePenetration(
-            //         self, transform.position, transform.rotation,
-            //         col, col.transform.position, col.transform.rotation,
-            //         out dir, out dis
-            //     );
-
-            //     if (overlapped)
-            //     {
-            //         Debug.Log(dis);
-            //         // Debug.Log(dir);
-            //         Gizmos.color = Color.red;
-            //         Gizmos.DrawRay(transform.position, dir * dis);
-            //     }
-            // }
 
             // SphereCast for specific ground check.
             Vector3 groundedRayStart = (m_Rigidbody ? m_Rigidbody.position : transform.position) + transform.up;
@@ -213,16 +210,39 @@ namespace ExtensibleCharacterController.Characters
             bool isHit = Physics.SphereCast(groundedRayStart, m_GroundRadius, -transform.up, out hit, m_GroundDistance, ~m_CharacterLayer.value);
             if (isHit)
             {
+                // Draw SphereCast sphere.
                 Gizmos.color = Color.red;
                 Gizmos.DrawWireSphere(groundedRayStart + -transform.up * hit.distance, m_GroundRadius);
 
-                Gizmos.color = Color.green;
-                // Gizmos.DrawLine(hit.point, hit.transform.forward * 2.5f);
-                Gizmos.DrawLine(hit.normal, hit.normal * 2);
+                // Draw hit point normal.
+                Gizmos.color = Color.cyan;
+                // Gizmos.DrawRay(hit.point, hit.normal * 3.0f);
+
+                // // TODO: Testing Physics.ComputePenetration().
+                // Collider self = GetComponentInChildren<Collider>();
+
+                // Collider[] cols = Physics.OverlapSphere(groundedSphereStart, m_GroundRadius, ~m_CharacterLayer.value);
+                // for (int i = 0; i < cols.Length; i++)
+                // {
+                //     Collider col = cols[i];
+                //     Vector3 normal = Vector3.zero;
+                //     float distance = 0.0f;
+
+                //     bool overlapped = Physics.ComputePenetration(
+                //         self, self.transform.position, self.transform.rotation,
+                //         col, col.transform.position, col.transform.rotation,
+                //         out normal, out distance
+                //     );
+
+                //     if (overlapped)
+                //     {
+                //         Vector3 posCorrection = normal * distance;
+                //         transform.position += posCorrection;
+                //     }
+                // }
             }
 
             Gizmos.color = color;
-            Gizmos.matrix = matrix;
         }
     }
 }
