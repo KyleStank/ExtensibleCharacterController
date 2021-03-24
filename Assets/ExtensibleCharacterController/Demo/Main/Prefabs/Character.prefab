@@ -253,7 +253,7 @@ MonoBehaviour:
     m_Variable: {fileID: 0}
   m_GroundDistance:
     m_UseConstantValue: 1
-    m_ConstantValue: 1.25
+    m_ConstantValue: 2
     m_Variable: {fileID: 0}
   m_CharacterBehaviourNames:
   - ECCMovementBehaviour
