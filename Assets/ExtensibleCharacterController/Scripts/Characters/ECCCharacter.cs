@@ -16,6 +16,8 @@ namespace ExtensibleCharacterController.Characters
     [RequireComponent(typeof(Rigidbody))]
     public class ECCCharacter : ECCBehaviour
     {
+        private const float COLLIDER_OFFSET = 0.01f;
+
         [Header("Generic Settings")]
         [SerializeField]
         private LayerMask m_CharacterLayer;
@@ -23,6 +25,8 @@ namespace ExtensibleCharacterController.Characters
         private ECCBoolReference m_UseGravity = true;
         [SerializeField]
         private ECCFloatReference m_Gravity = -Physics.gravity.y;
+        [SerializeField]
+        private ECCFloatReference m_SkinWidth = 0.1f;
 
         // TODO: Move ground checking to a custom behaviour?
         [Header("Ground Settings")]
@@ -51,7 +55,10 @@ namespace ExtensibleCharacterController.Characters
         }
 
         private CapsuleCollider m_Collider = null;
+        private Vector3 m_MovementDirection = Vector3.zero;
+        private Vector3 m_PrevPosition = Vector3.zero;
         private Vector3 m_UpdatePosition = Vector3.zero;
+        private Vector3 m_GravityDirection = -Vector3.up;
         private bool m_IsGrounded = false;
 
         protected override void Initialize()
@@ -64,7 +71,9 @@ namespace ExtensibleCharacterController.Characters
             SetupRigidbody();
 
             m_Collider = GetComponentInChildren<CapsuleCollider>();
-            m_UpdatePosition = m_Rigidbody.position;
+            m_UpdatePosition = m_PrevPosition = m_Rigidbody.position;
+            m_MovementDirection = Vector3.zero;
+            m_GravityDirection = -transform.up;
 
             // TODO: Does not work in Runtime build. Fix.
             for (int i = 0; i < m_CharacterBehaviours.Count; i++)
@@ -138,45 +147,40 @@ namespace ExtensibleCharacterController.Characters
 
         private void FixedUpdate()
         {
-            Vector3 updatePosition = m_Rigidbody.position;
-            // m_IsGrounded = CheckForGround(updatePosition);
-
-            // Apply all required calculations to next position.
-            updatePosition = GetGroundCheckPosition(updatePosition);
-            updatePosition = !m_IsGrounded && m_UseGravity ? GetGravityPosition(updatePosition, -Vector3.up) : updatePosition;
-
-
             // TODO: Test movement. Move elsewhere sometime.
+            // Add input and gravity to movement direction.
             Vector3 input = new Vector3(horizontal, 0.0f, vertical);
-            updatePosition += (input * 5.0f) * Time.fixedDeltaTime;
+            m_MovementDirection += (input * 5.0f) * Time.fixedDeltaTime;
+            m_MovementDirection = !m_IsGrounded && m_UseGravity ? GetGravityPosition(m_MovementDirection, m_GravityDirection) : m_MovementDirection;
+
+            // m_MovementDirection = GetGroundCheckPosition(m_MovementDirection, out m_IsGrounded);
+            m_MovementDirection = GetGroundCheckPosition(m_MovementDirection, out m_IsGrounded);
 
             // Apply new updated position.
-            m_UpdatePosition = updatePosition;
-            m_Rigidbody.MovePosition(m_UpdatePosition);
+            m_Rigidbody.position += m_MovementDirection;
+            m_MovementDirection = Vector3.zero;
         }
 
-        private Vector3 GetGravityPosition(Vector3 position, Vector3 direction)
+        private Vector3 GetGravityPosition(Vector3 moveDirection, Vector3 direction)
         {
-            return position + (direction * m_Gravity * Time.fixedDeltaTime);
+            return moveDirection + (direction * m_Gravity * Time.fixedDeltaTime);
         }
 
-        private bool CheckForGround(Vector3 position)
+        private Vector3 GetGroundCheckPosition(Vector3 moveDirection, out bool grounded)
         {
-            // TransformDirection() accounts for rotations.
-            return Physics.CheckSphere(position + transform.TransformDirection(m_GroundOffset), m_GroundRadius, ~m_CharacterLayer.value);
-        }
+            m_Collider.radius += COLLIDER_OFFSET;
 
-        private Vector3 GetGroundCheckPosition(Vector3 position)
-        {
             Vector3 center, capStart, capEnd;
             ECCColliderHelper.CalculateCapsuleCaps(
                 m_Collider,
-                m_Collider.transform.position,
+                m_Collider.transform.position + (transform.up * COLLIDER_OFFSET),
                 m_Collider.transform.rotation,
                 out center,
                 out capStart,
                 out capEnd
             );
+
+            // If any collider is overlapped, get the direction it needs to move to not be overlapped.
             RaycastHit[] hits = ECCColliderHelper.CapsuleCastAll(
                 m_Collider,
                 Vector3.zero,
@@ -184,14 +188,11 @@ namespace ExtensibleCharacterController.Characters
                 m_CharacterLayer,
                 true
             );
-
-            Vector3 offset = Vector3.zero;
-            m_IsGrounded = hits.Length == 0;
+            grounded = false;
+            Vector3 overlapCorrectionOffset = Vector3.zero;
             for (int i = 0; i < hits.Length; i++)
             {
                 RaycastHit hit = hits[i];
-
-                // Draw closest point.
                 Collider hitCollider = hit.collider;
                 if (hit.distance == 0)
                 {
@@ -204,58 +205,51 @@ namespace ExtensibleCharacterController.Characters
                     );
                     if (overlapped && distance >= 0.001f) // Account for float precision errors.
                     {
-                        Vector3 dir = direction * distance;
-                        offset += dir;
+                        overlapCorrectionOffset += direction * distance;
                     }
                 }
             }
 
-            // Apply positional corrections from Physics.ComputePenetration().
-            position += offset;
-
-            // Check again for ground.
-            ECCColliderHelper.CalculateCapsuleCaps(
-                m_Collider,
-                m_Collider.transform.position,
-                m_Collider.transform.rotation,
-                out center,
-                out capStart,
-                out capEnd
-            );
+            // Check again for ground to ensure actually grounded.
+            float verticalOffset = 0.0f;
             RaycastHit groundHit;
-            m_IsGrounded = ECCColliderHelper.CapsuleCast(
+            grounded = ECCColliderHelper.CapsuleCast(
                 m_Collider,
-                transform.up * 0.8f, // TODO: Remove random constant with something nicer.
-                -transform.up * 1.0f,
+                transform.up,
+                -transform.up * (1.0f + (m_SkinWidth * 2.0f)),
                 m_CharacterLayer,
                 out groundHit,
                 true
             );
-            if (m_IsGrounded)
+            if (grounded)
             {
-                // TODO: Wtf. This is getting annoying. I REALLY need to figure this out!
-                // float posY = position.y;
-                // Vector3 point = position - (groundHit.point * groundHit.distance);
-                // float skinWidth = 0.1f;
-                // posY += Mathf.Max(skinWidth, point.y - skinWidth);
-                // position.y = posY;
+                Vector3 closestPoint = m_Collider.ClosestPoint(groundHit.point);
+                Vector3 distance = (groundHit.point - closestPoint);
+                verticalOffset = distance.y + m_SkinWidth + COLLIDER_OFFSET;
             }
 
-            return position;
+            // Apply positional corrections.
+            moveDirection += overlapCorrectionOffset;
+            moveDirection.y += verticalOffset;
+
+            m_Collider.radius -= COLLIDER_OFFSET;
+
+            return moveDirection;
         }
 
         #if UNITY_EDITOR
         private void OnDrawGizmos()
         {
-            m_Collider = m_Collider ? m_Collider : GetComponentInChildren<CapsuleCollider>();
-
             Color color = Gizmos.color;
 
-            Gizmos.color = Color.yellow;
+            Vector3 moveDirection = Vector3.zero;
+            m_Collider = m_Collider ? m_Collider : GetComponentInChildren<CapsuleCollider>();
+            m_Collider.radius += COLLIDER_OFFSET;
+
             Vector3 center, capStart, capEnd;
             ECCColliderHelper.CalculateCapsuleCaps(
                 m_Collider,
-                m_Collider.transform.position,
+                m_Collider.transform.position + (transform.up * COLLIDER_OFFSET),
                 m_Collider.transform.rotation,
                 out center,
                 out capStart,
@@ -269,21 +263,9 @@ namespace ExtensibleCharacterController.Characters
                 true
             );
 
-            // Draw CapsuleCast capsule.
-            Gizmos.color = Color.cyan;
-            DrawWireCapsule(center, transform.rotation, m_Collider.radius, 2, Color.yellow);
-
-            Vector3 offset = Vector3.zero;
+            Vector3 overlapCorrectionOffset = Vector3.zero;
             for (int i = 0; i < hits.Length; i++)
             {
-                RaycastHit hit = hits[i];
-
-                // Draw closest point.
-                Collider hitCollider = hit.collider;
-                Vector3 closestPoint = m_Collider.ClosestPoint(hit.point);
-                Gizmos.DrawSphere(hit.point, 0.1f);
-                Gizmos.DrawWireSphere(closestPoint, 0.1f);
-
                 // Draw hit point normal.
                 Gizmos.color = Color.cyan;
                 RaycastHit normalHit;
@@ -291,7 +273,64 @@ namespace ExtensibleCharacterController.Characters
                 {
                     Gizmos.DrawRay(normalHit.point, normalHit.normal * 3.0f);
                 }
+
+                RaycastHit hit = hits[i];
+                Collider hitCollider = hit.collider;
+                if (hit.distance == 0)
+                {
+                    Vector3 direction;
+                    float distance;
+                    bool overlapped = Physics.ComputePenetration(
+                        m_Collider, m_Collider.transform.position, m_Collider.transform.rotation,
+                        hitCollider, hitCollider.transform.position, hitCollider.transform.rotation,
+                        out direction, out distance
+                    );
+                    if (overlapped && distance >= 0.001f) // Account for float precision errors.
+                    {
+                        overlapCorrectionOffset += direction * distance;
+                    }
+                }
+
+                // Draw closest point.
+                Gizmos.color = Color.cyan;
+                Vector3 closestPoint = m_Collider.ClosestPoint(hit.point);
+                Gizmos.DrawSphere(hit.point, 0.1f);
+                Gizmos.DrawWireSphere(closestPoint, 0.1f);
             }
+
+            // Check again for ground to ensure actually grounded.
+            float verticalOffset = 0.0f;
+            RaycastHit groundHit;
+            bool grounded = ECCColliderHelper.CapsuleCast(
+                m_Collider,
+                transform.up,
+                -transform.up * (1.0f + (m_SkinWidth * 2.0f)),
+                m_CharacterLayer,
+                out groundHit,
+                true
+            );
+            if (grounded)
+            {
+                Vector3 closestPoint = m_Collider.ClosestPoint(groundHit.point);
+                Vector3 distance = (groundHit.point - closestPoint);
+                verticalOffset = distance.y + m_SkinWidth + COLLIDER_OFFSET;
+            }
+
+            moveDirection += overlapCorrectionOffset;
+            moveDirection.y += verticalOffset;
+
+            Gizmos.color = Color.yellow;
+            DrawWireCapsule(
+                (m_Collider.transform.position +
+                (center - m_Collider.transform.position - (transform.up * COLLIDER_OFFSET))) +
+                moveDirection,
+                transform.rotation,
+                m_Collider.radius,
+                m_Collider.height,
+                Color.yellow
+            );
+
+            m_Collider.radius -= COLLIDER_OFFSET;
 
             Gizmos.color = color;
         }
