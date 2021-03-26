@@ -13,8 +13,10 @@ namespace ExtensibleCharacterController.Controllers
         [Header("References")]
         [SerializeField]
         private ECCBaseCamera m_ActiveCamera = null;
+        // [SerializeField]
+        // private ECCCharacterController m_CharacterTarget = null;
         [SerializeField]
-        private ECCCharacterController m_CharacterTarget = null;
+        private Transform m_Target = null;
         [SerializeField]
         private ECCStringReference m_CharacterTag = "Player";
 
@@ -43,27 +45,28 @@ namespace ExtensibleCharacterController.Controllers
                     LogError("Could not find [ECCBaseCamera] in children. [" + name + "] will not function properly.");
             }
 
-            // Find character reference.
-            if (m_CharacterTarget == null)
-            {
-                GameObject go = GameObject.FindGameObjectWithTag(m_CharacterTag);
-                if (go != null)
-                {
-                    m_CharacterTarget = go.GetComponent<ECCCharacterController>();
-                    if (m_CharacterTarget == null)
-                        LogError("Could not find component [ECCCharacterController] on GameObject [" + go.name + "]");
-                }
-                else
-                {
-                    LogError("Could not find GameObject with tag [" + m_CharacterTag + "]");
-                }
-            }
+            // // Find character reference.
+            // if (m_CharacterTarget == null)
+            // {
+            //     GameObject go = GameObject.FindGameObjectWithTag(m_CharacterTag);
+            //     if (go != null)
+            //     {
+            //         m_CharacterTarget = go.GetComponent<ECCCharacterController>();
+            //         if (m_CharacterTarget == null)
+            //             LogError("Could not find component [ECCCharacterController] on GameObject [" + go.name + "]");
+            //     }
+            //     else
+            //     {
+            //         LogError("Could not find GameObject with tag [" + m_CharacterTag + "]");
+            //     }
+            // }
 
             // Camera or character could still be null, so we check again.
-            if (m_ActiveCamera != null && m_CharacterTarget != null)
+            if (m_ActiveCamera != null && m_Target != null)
             {
-                m_ActiveCamera.SetTarget(m_CharacterTarget.transform);
-                m_CharacterTarget.SetCamera(m_ActiveCamera);
+                m_ActiveCamera.SetTarget(m_Target);
+                // m_ActiveCamera.SetTarget(m_CharacterTarget.transform);
+                // m_CharacterTarget.SetCamera(m_ActiveCamera);
             }
         }
 

@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1 &3873390380361293681
+--- !u!1 &1117603663124164961
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -8,37 +8,38 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 7981274813364313993}
-  - component: {fileID: 4919784096873949311}
-  - component: {fileID: 2198909414072380024}
+  - component: {fileID: 5149948889379368441}
+  - component: {fileID: 3022525959341501694}
+  - component: {fileID: 1717775820122702631}
+  - component: {fileID: 7078281825477402356}
   m_Layer: 0
-  m_Name: TestCamera
+  m_Name: ThirdPersonCamera
   m_TagString: MainCamera
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &7981274813364313993
+--- !u!4 &5149948889379368441
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3873390380361293681}
-  m_LocalRotation: {x: 0.21456483, y: 0, z: 0, w: 0.9767098}
-  m_LocalPosition: {x: 0, y: 4.63, z: -6.2}
+  m_GameObject: {fileID: 1117603663124164961}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 3931504956338146723}
   m_RootOrder: 1
-  m_LocalEulerAnglesHint: {x: 24.78, y: 0, z: 0}
---- !u!20 &4919784096873949311
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!20 &3022525959341501694
 Camera:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3873390380361293681}
+  m_GameObject: {fileID: 1117603663124164961}
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 1
@@ -75,14 +76,62 @@ Camera:
   m_OcclusionCulling: 1
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
---- !u!81 &2198909414072380024
+--- !u!81 &1717775820122702631
 AudioListener:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3873390380361293681}
+  m_GameObject: {fileID: 1117603663124164961}
   m_Enabled: 1
+--- !u!114 &7078281825477402356
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1117603663124164961}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6b47749739400a14296888bd923cf520, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_ShowBaseProps:
+    m_UseConstantValue: 1
+    m_ConstantValue: 0
+    m_Variable: {fileID: 0}
+  m_ShowDerivedProps:
+    m_UseConstantValue: 1
+    m_ConstantValue: 0
+    m_Variable: {fileID: 0}
+  m_LoggingEnabled:
+    m_UseConstantValue: 1
+    m_ConstantValue: 1
+    m_Variable: {fileID: 0}
+  m_Offset:
+    m_UseConstantValue: 1
+    m_ConstantValue: {x: 0, y: 5, z: -3}
+    m_Variable: {fileID: 0}
+  m_Sensitivity:
+    m_UseConstantValue: 0
+    m_ConstantValue: {x: 5, y: 5}
+    m_Variable: {fileID: 11400000, guid: 988752fe69132aa4dbc6dd344484a007, type: 2}
+  m_TopClamp:
+    m_UseConstantValue: 1
+    m_ConstantValue: -65
+    m_Variable: {fileID: 0}
+  m_BottomClamp:
+    m_UseConstantValue: 1
+    m_ConstantValue: 65
+    m_Variable: {fileID: 0}
+  m_EnableSmoothing:
+    m_UseConstantValue: 1
+    m_ConstantValue: 0
+    m_Variable: {fileID: 0}
+  m_RotationSpeed:
+    m_UseConstantValue: 1
+    m_ConstantValue: 10
+    m_Variable: {fileID: 0}
 --- !u!1 &3931504956338146722
 GameObject:
   m_ObjectHideFlags: 0
@@ -113,7 +162,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 3931504956564986981}
-  - {fileID: 7981274813364313993}
+  - {fileID: 5149948889379368441}
   m_Father: {fileID: 0}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -171,7 +220,7 @@ MonoBehaviour:
     m_ConstantValue: 0
     m_Variable: {fileID: 0}
   m_ActiveCamera: {fileID: 0}
-  m_CharacterTarget: {fileID: 0}
+  m_Target: {fileID: 0}
   m_CharacterTag:
     m_UseConstantValue: 1
     m_ConstantValue: Player
@@ -290,7 +339,7 @@ MonoBehaviour:
     m_Variable: {fileID: 0}
   m_Offset:
     m_UseConstantValue: 1
-    m_ConstantValue: {x: 0, y: 0.5, z: 0.4}
+    m_ConstantValue: {x: 0, y: 1.5, z: 2.68}
     m_Variable: {fileID: 0}
   m_Sensitivity:
     m_UseConstantValue: 0
