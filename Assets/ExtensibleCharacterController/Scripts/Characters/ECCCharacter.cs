@@ -195,6 +195,9 @@ namespace ExtensibleCharacterController.Characters
 
                 Gizmos.color = Color.cyan;
                 Gizmos.DrawSphere(hit.point, 0.1f);
+                Vector3 closestPoint = m_Collider.ClosestPoint(hit.point);
+                Gizmos.DrawWireSphere(closestPoint, 0.1f);
+                Gizmos.DrawWireSphere(transform.TransformPoint(transform.position - closestPoint), 0.1f);
             }
 
             // Draw bottom half.
@@ -447,11 +450,37 @@ namespace ExtensibleCharacterController.Characters
                     }
                 }
 
-                float dis = (closestHit.point - m_Rigidbody.position).y - COLLIDER_OFFSET;
-                dis = Mathf.Abs(dis) <= COLLIDER_OFFSET ? 0.0f : dis;
+                // // NON-NORMALIZED
+                // float dis = (closestHit.point - m_Rigidbody.position).y - COLLIDER_OFFSET;
+                // dis = Mathf.Abs(dis) <= COLLIDER_OFFSET ? 0.0f : dis;
 
-                Vector3 moveDirectionNormal = Vector3.ProjectOnPlane(m_MovementDirection, closestHit.normal);
-                m_MovementDirection.y += (dis - moveDirectionNormal.y) - (COLLIDER_OFFSET * 2.0f);  // Acount for both offsets.
+                // Vector3 moveDirectionNormal = Vector3.ProjectOnPlane(m_MovementDirection, closestHit.normal);
+                // m_MovementDirection.y += (dis - moveDirectionNormal.y) - (COLLIDER_OFFSET * 2.0f);  // Acount for both offsets.
+
+                // NORMALIZED
+                // Vector3 projectedMoveDirection = Vector3.ProjectOnPlane(m_MovementDirection, closestHit.normal);
+                // m_MovementDirection += (projectedMoveDirection - m_MovementDirection);
+
+                // Calculate the movement direction based on angles of collision. Could be a small slope or a right degree wall.
+                Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MovementDirection, transform.up); // Convert move direction to horizontal.
+                Debug.Log(horizontalMoveDirection);
+                Vector3 orthoHitNormal = Vector3.ProjectOnPlane(closestHit.normal, transform.up).normalized; // Return an orthogonal version of hit.normal.
+                Vector3 targetDirection = Vector3.Cross(orthoHitNormal, transform.up).normalized; // Return a orthogonal Vector based on the orthHitNormal and transform.up.
+
+                // Returns an orthogonal Vector that is pointing up or down. This is used to check if we are moving up or down a slope and/or angle.
+                Vector3 slopeDirection = Vector3.Cross(orthoHitNormal, horizontalMoveDirection).normalized;
+
+                bool movingDown = Vector3.Dot(slopeDirection, transform.up) > 0.0f;
+                if (movingDown)
+                {
+                    targetDirection = -targetDirection;
+                }
+
+                // Draw hit normals.
+                Debug.DrawRay(closestHit.point, transform.up, Color.green); // Up direction "normal"
+                Debug.DrawRay(closestHit.point, orthoHitNormal, Color.green); // Orthogonal normal of regular hit.normal
+                Debug.DrawRay(closestHit.point, closestHit.normal, Color.green); // Regular hit.normal
+                Debug.DrawRay(transform.position, targetDirection, Color.magenta); // Target direction based on normals
             }
             else
             {
