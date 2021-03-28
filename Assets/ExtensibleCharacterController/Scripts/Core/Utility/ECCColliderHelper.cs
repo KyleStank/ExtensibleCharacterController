@@ -18,6 +18,7 @@ namespace ExtensibleCharacterController.Core.Utility
         /// <param name="start">Outputted start end cap of CapsuleCollider.</param>
         /// <param name="end">Outputted end end cap of CapsuleCollider.</param>
         /// <param name="height">Optional height that will be used instead of the CapsuleCollider's height.</param>
+        /// <param name="radius">Optional radius that will be used instead of the CapsuleCollider's radius.</param>
         public static void CalculateCapsuleCaps(
             CapsuleCollider collider,
             Vector3 position,
@@ -25,14 +26,17 @@ namespace ExtensibleCharacterController.Core.Utility
             out Vector3 center,
             out Vector3 start,
             out Vector3 end,
-            float? height = null
+            float? height = null,
+            float? radius = null
         )
         {
             Vector3 direction = GetCapsuleDirection(collider);
             float heightScale = GetCapsuleHeightScale(collider);
             float radiusScale = GetCapsuleRadiusScale(collider);
 
-            float capAdjustment = ((height != null ? (float)height : collider.height) / 2.0f * heightScale) - (collider.radius * radiusScale);
+            float capAdjustment =
+                ((height != null ? (float)height : collider.height) / 2.0f * heightScale) -
+                ((radius != null ? (float)radius : collider.radius) * radiusScale);
             center = ECCMathHelper.TransformPoint(position, rotation, Vector3.Scale(collider.center, collider.transform.lossyScale));
             start = center - (direction * capAdjustment);
             end = center + (direction * capAdjustment);
@@ -48,17 +52,19 @@ namespace ExtensibleCharacterController.Core.Utility
         /// <param name="start">Outputted start end cap of CapsuleCollider.</param>
         /// <param name="end">Outputted end end cap of CapsuleCollider.</param>
         /// <param name="height">Optional height that will be used instead of the CapsuleCollider's height.</param>
+        /// /// <param name="radius">Optional radius that will be used instead of the CapsuleCollider's radius.</param>
         public static void CalculateCapsuleCaps(
             CapsuleCollider collider,
             Vector3 position,
             Quaternion rotation,
             out Vector3 start,
             out Vector3 end,
-            float? height = null
+            float? height = null,
+            float? radius = null
         )
         {
             Vector3 center;
-            CalculateCapsuleCaps(collider, position, rotation, out center, out start, out end, height);
+            CalculateCapsuleCaps(collider, position, rotation, out center, out start, out end, height, radius);
         }
 
         /// <summary>

@@ -118,11 +118,11 @@ MonoBehaviour:
     m_Variable: {fileID: 11400000, guid: 988752fe69132aa4dbc6dd344484a007, type: 2}
   m_TopClamp:
     m_UseConstantValue: 1
-    m_ConstantValue: -65
+    m_ConstantValue: 50
     m_Variable: {fileID: 0}
   m_BottomClamp:
     m_UseConstantValue: 1
-    m_ConstantValue: 65
+    m_ConstantValue: 50
     m_Variable: {fileID: 0}
   m_EnableSmoothing:
     m_UseConstantValue: 1
