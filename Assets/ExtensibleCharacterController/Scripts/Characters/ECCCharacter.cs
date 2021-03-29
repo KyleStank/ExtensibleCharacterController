@@ -151,68 +151,6 @@ namespace ExtensibleCharacterController.Characters
             mouseY = Input.GetAxis("Mouse Y");
         }
 
-        private bool CheckForGround(Vector3 moveDirection, out RaycastHit closestHit)
-        {
-            closestHit = default(RaycastHit);
-            Vector3 topHalfCapsulePos = Vector3.zero;
-
-            // Get direction of capsule and calculate half of the height, including scale and skin width.
-            float heightScale = ECCColliderHelper.GetCapsuleHeightScale(m_Collider);
-            float adjustedHalfHeight = (m_Collider.height / 2.0f) + m_SkinWidth;
-            float scaledHalfHeight = adjustedHalfHeight * heightScale;
-            Vector3 direction = ECCColliderHelper.GetCapsuleDirection(m_Collider);
-
-            // Calculate a position for the ground check at the BOTTOM half of the CapsuleCollider.
-            // Since the adjusted half height is used as the full height, we need to half it one more time.
-            Vector3 bottomHalfCapsulePos = m_Collider.transform.position
-                - (direction * (scaledHalfHeight / 2.0f))
-                + (m_Collider.transform.InverseTransformDirection(moveDirection));
-            ECCColliderHelper.CalculateCapsuleCaps(
-                m_Collider,
-                bottomHalfCapsulePos,
-                m_Collider.transform.rotation,
-                out Vector3 bottomCapStart,
-                out Vector3 bottomCapEnd,
-                adjustedHalfHeight
-            );
-
-            // Use CheckCapsule to detect a collision. Better than always performing a CapsuleCast.
-            bool grounded = Physics.CheckCapsule(bottomCapStart, bottomCapEnd, m_Collider.radius, ~m_CharacterLayer.value);
-            if (grounded)
-            {
-                // Perform CapsuleCast to check if the collision is actually the ground.
-                RaycastHit[] hits = PerformGroundCast(moveDirection);
-                if (hits.Length > 0)
-                {
-                    closestHit.distance = 999.0f;
-
-                    // Find the closest RaycastHit.
-                    bool isValid = false;
-                    for (int i = 0; i < hits.Length; i++)
-                    {
-                        // Calculate slope. If it's greater than the maximum slope allowed, than we are not grounded.
-                        float angle = Vector3.Angle(hits[i].normal, m_Collider.transform.up);
-                        if (angle > m_MaxSlopeAngle) continue;
-
-                        if (hits[i].distance < closestHit.distance)
-                        {
-                            closestHit = hits[i];
-                            isValid = true;
-                        }
-                    }
-
-                    // If a closest point was found, that means it also passed the slope check, meaning the ground is valid.
-                    grounded = isValid;
-                }
-                else
-                {
-                    grounded = false;
-                }
-            }
-
-            return grounded;
-        }
-
         private RaycastHit[] PerformGroundCast(Vector3 moveDirection)
         {
             // Get direction of capsule and calculate half of the height, including scale and skin width.
@@ -260,7 +198,7 @@ namespace ExtensibleCharacterController.Characters
 
             m_MoveDirection += CreateGroundMoveDirection(m_MoveDirection);
 
-            m_MoveDirection += HandleVerticalCollisions(m_MoveDirection);
+            Debug.Log(m_MoveDirection);
 
             // Apply new updated position.
             m_Rigidbody.MovePosition(m_Rigidbody.position + (m_MoveDirection * Time.fixedDeltaTime));
@@ -347,6 +285,11 @@ namespace ExtensibleCharacterController.Characters
 
                 // Exclude horizontal move direction to prevent wrong speed or directions.
                 direction += (targetDirection * horizontalMoveDirection.magnitude) - horizontalMoveDirection;
+                direction -= transform.up * (m_SkinWidth - COLLIDER_OFFSET);
+
+                // Fix vertical collision overlaps.
+                Vector3 offset = HandleVerticalCollisions(direction, closestHit);
+                direction += offset;
             }
             else
             {
@@ -358,105 +301,22 @@ namespace ExtensibleCharacterController.Characters
             return direction;
         }
 
-        private Vector3 HandleVerticalCollisions(Vector3 moveDirection)
+        private Vector3 HandleVerticalCollisions(Vector3 offset, RaycastHit hit)
         {
-            Vector3 direction = Vector3.zero;
+            Vector3 dir = Vector3.zero;
+            Collider hitCollider = hit.collider;
 
-            // Vector3 direction;
-            // float distance;
-            // bool overlapped = Physics.ComputePenetration(
-            //     m_Collider, m_Collider.transform.position, m_Collider.transform.rotation,
-            //     hitCollider, hitCollider.transform.position, hitCollider.transform.rotation,
-            //     out direction, out distance
-            // );
-            // if (overlapped && distance >= 0.001f) // Account for float precision errors.
-            // {
-            //     overlapCorrectionOffset += direction * distance;
-            // }
-
-            return direction;
-        }
-
-        private Vector3 GetGroundCheckPosition(Vector3 moveDirection, out bool grounded)
-        {
-            m_Collider.radius += COLLIDER_OFFSET;
-
-            Vector3 center, capStart, capEnd;
-            ECCColliderHelper.CalculateCapsuleCaps(
-                m_Collider,
-                m_Collider.transform.position + (transform.up * COLLIDER_OFFSET),
-                m_Collider.transform.rotation,
-                out center,
-                out capStart,
-                out capEnd
+            bool overlapped = Physics.ComputePenetration(
+                m_Collider, m_Collider.transform.position + offset, m_Collider.transform.rotation,
+                hitCollider, hitCollider.transform.position, hitCollider.transform.rotation,
+                out Vector3 direction, out float distance
             );
-
-            // If any collider is overlapped, get the direction it needs to move to not be overlapped.
-            RaycastHit[] hits = ECCColliderHelper.CapsuleCastAll(
-                m_Collider,
-                Vector3.zero,
-                -transform.up,
-                m_CharacterLayer,
-                true
-            );
-            grounded = false;
-            Vector3 overlapCorrectionOffset = Vector3.zero;
-            for (int i = 0; i < hits.Length; i++)
+            if (overlapped && distance >= 0.001f) // Account for float precision errors.
             {
-                RaycastHit hit = hits[i];
-
-                // If slope is too high, don't try to correct vertical position.
-                float angle = Vector3.Angle(hit.normal, transform.up);
-                if (angle > m_MaxSlopeAngle) continue;
-
-                Collider hitCollider = hit.collider;
-                if (hit.distance == 0)
-                {
-                    Vector3 direction;
-                    float distance;
-                    bool overlapped = Physics.ComputePenetration(
-                        m_Collider, m_Collider.transform.position, m_Collider.transform.rotation,
-                        hitCollider, hitCollider.transform.position, hitCollider.transform.rotation,
-                        out direction, out distance
-                    );
-                    if (overlapped && distance >= 0.001f) // Account for float precision errors.
-                    {
-                        overlapCorrectionOffset += direction * distance;
-                    }
-                }
+                dir += direction.normalized * (distance);
             }
 
-            // Check again for ground to ensure actually grounded.
-            float verticalOffset = 0.0f;
-            RaycastHit groundHit;
-            grounded = ECCColliderHelper.CapsuleCast(
-                m_Collider,
-                transform.up,
-                -transform.up * (1.0f + (m_SkinWidth * 2.0f)),
-                m_CharacterLayer,
-                out groundHit,
-                true
-            );
-            if (grounded)
-            {
-                Vector3 closestPoint = m_Collider.ClosestPoint(groundHit.point);
-                Vector3 distance = (groundHit.point - closestPoint);
-                verticalOffset = distance.y + m_SkinWidth + COLLIDER_OFFSET;
-
-                // If slope is too high, don't use the vertical offset.
-                float groundAngle = Vector3.Angle(groundHit.normal, transform.up);
-                if (groundAngle > m_MaxSlopeAngle) verticalOffset = 0.0f;
-            }
-
-            // Apply positional corrections.
-            moveDirection += overlapCorrectionOffset;
-            moveDirection.y += verticalOffset;
-
-            Debug.Log("Move Dir: " + moveDirection);
-
-            m_Collider.radius -= COLLIDER_OFFSET;
-
-            return moveDirection;
+            return dir;
         }
 
         #if UNITY_EDITOR
