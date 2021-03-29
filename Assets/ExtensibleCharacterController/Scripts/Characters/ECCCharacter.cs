@@ -56,7 +56,7 @@ namespace ExtensibleCharacterController.Characters
         }
 
         private CapsuleCollider m_Collider = null;
-        private Vector3 m_MovementDirection = Vector3.zero;
+        private Vector3 m_MoveDirection = Vector3.zero;
         private Vector3 m_PrevPosition = Vector3.zero;
         private Vector3 m_UpdatePosition = Vector3.zero;
         private Vector3 m_GravityDirection = -Vector3.up;
@@ -73,7 +73,7 @@ namespace ExtensibleCharacterController.Characters
 
             m_Collider = GetComponentInChildren<CapsuleCollider>();
             m_UpdatePosition = m_PrevPosition = m_Rigidbody.position;
-            m_MovementDirection = Vector3.zero;
+            m_MoveDirection = Vector3.zero;
             m_GravityDirection = -transform.up;
 
             // TODO: Does not work in Runtime build. Fix.
@@ -155,7 +155,7 @@ namespace ExtensibleCharacterController.Characters
         {
             Color tempColor = Gizmos.color;
 
-            Vector3 moveDirection = m_MovementDirection;
+            Vector3 moveDirection = m_MoveDirection;
             m_Collider = m_Collider ? m_Collider : GetComponentInChildren<CapsuleCollider>();
             m_Collider.radius += COLLIDER_OFFSET;
 
@@ -417,16 +417,21 @@ namespace ExtensibleCharacterController.Characters
 
         private void FixedUpdate()
         {
-            m_MovementDirection = !m_IsGrounded && m_UseGravity ? GetGravityPosition(m_MovementDirection, m_GravityDirection) : m_MovementDirection;
+            // Apply gravity.
+            if (!m_IsGrounded && m_UseGravity)
+            {
+                m_MoveDirection += m_GravityDirection * m_Gravity;
+                Debug.Log("Apply gravity!");
+            }
 
             // TODO: Test movement and rotation. Move elsewhere sometime.
             m_Rigidbody.rotation = GetMovementRotation(m_Rigidbody.rotation.eulerAngles);
-            m_MovementDirection = GetHorizontalPosition(m_MovementDirection);
+            m_MoveDirection = GetHorizontalPosition(m_MoveDirection);
 
             // HandleVerticalCollisions(ref m_MovementDirection);
 
             // TODO: Move ground stuff...
-            RaycastHit[] hits = PerformGroundCast(m_MovementDirection);
+            RaycastHit[] hits = PerformGroundCast(Vector3.zero); // Multiply by delta time to find "next frame" direction.
             List<RaycastHit> validHits = new List<RaycastHit>();
             for (int i = 0; i < hits.Length; i++)
             {
@@ -450,35 +455,12 @@ namespace ExtensibleCharacterController.Characters
                     }
                 }
 
-                // // NON-NORMALIZED
-                // float dis = (closestHit.point - m_Rigidbody.position).y - COLLIDER_OFFSET;
-                // dis = Mathf.Abs(dis) <= COLLIDER_OFFSET ? 0.0f : dis;
-
-                // Vector3 moveDirectionNormal = Vector3.ProjectOnPlane(m_MovementDirection, closestHit.normal);
-                // m_MovementDirection.y += (dis - moveDirectionNormal.y) - (COLLIDER_OFFSET * 2.0f);  // Acount for both offsets.
-
-                // NORMALIZED
-                // Vector3 projectedMoveDirection = Vector3.ProjectOnPlane(m_MovementDirection, closestHit.normal);
-                // m_MovementDirection += (projectedMoveDirection - m_MovementDirection);
-
-                // Calculate the movement direction based on angles of collision. Could be a small slope or a right degree wall.
-
-                // TODO: Vertical. Y & Z rotations affect it because the normal is transform.right, which uses the X axis.
-                Vector3 verticalMoveDirection = Vector3.ProjectOnPlane(m_MovementDirection, closestHit.normal);
+                // Create move direction that is forward on any surface (flat or sloped).
+                Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MoveDirection, transform.up);
                 Vector3 orthoHitNormal = Vector3.ProjectOnPlane(closestHit.normal, transform.right).normalized;
                 Vector3 targetDirection = Vector3.Cross(transform.right, closestHit.normal).normalized;
-                float dot = Vector3.Dot(transform.right, Vector3.Cross(verticalMoveDirection.normalized, orthoHitNormal.normalized));
-                if (dot > 0.0f)
-                {
-                    targetDirection = -targetDirection;
-                }
 
-                // // Draw target direction & normals.
-                // Debug.DrawRay(transform.position, targetDirection, Color.magenta);
-                // Debug.DrawRay(transform.position, closestHit.normal, Color.green);
-                // Debug.DrawRay(transform.position, orthoHitNormal, Color.green);
-                // Debug.DrawRay(transform.position, transform.right, Color.green);
-                m_MovementDirection = (targetDirection * verticalMoveDirection.magnitude);
+                m_MoveDirection += (targetDirection * horizontalMoveDirection.magnitude) - horizontalMoveDirection;
 
                 // // TODO: Horizontal direction.
                 // Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MovementDirection, transform.up); // Convert move direction to horizontal.
@@ -506,8 +488,8 @@ namespace ExtensibleCharacterController.Characters
             }
 
             // Apply new updated position.
-            m_Rigidbody.MovePosition(m_Rigidbody.position + m_MovementDirection);
-            m_MovementDirection = Vector3.zero;
+            m_Rigidbody.MovePosition(m_Rigidbody.position + (m_MoveDirection * Time.fixedDeltaTime));
+            m_MoveDirection = Vector3.zero;
         }
 
         private Quaternion GetMovementRotation(Vector3 rotation)
@@ -516,19 +498,16 @@ namespace ExtensibleCharacterController.Characters
             return Quaternion.Euler(rotation);
         }
 
-        private Vector3 GetGravityPosition(Vector3 moveDirection, Vector3 direction)
-        {
-            return moveDirection + (direction * m_Gravity * Time.fixedDeltaTime);
-        }
+        // private Vector3 GetGravityPosition(Vector3 moveDirection, Vector3 direction)
+        // {
+        //     return moveDirection + (direction * m_Gravity);
+        // }
 
         private Vector3 GetHorizontalPosition(Vector3 moveDirection)
         {
             // TODO: Test input. Again, put elsewhere.
             Vector3 input = new Vector3(horizontal, 0.0f, vertical);
-            moveDirection += Vector3.ProjectOnPlane(
-                (m_Rigidbody.rotation * input) * Time.fixedDeltaTime * 5.0f,
-                transform.up
-            );
+            moveDirection += (m_Rigidbody.rotation * input).normalized * 5.0f;
 
             // m_Collider.radius += COLLIDER_OFFSET;
 
