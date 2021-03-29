@@ -285,7 +285,6 @@ namespace ExtensibleCharacterController.Characters
 
                 // Exclude horizontal move direction to prevent wrong speed or directions.
                 direction += (targetDirection * horizontalMoveDirection.magnitude) - horizontalMoveDirection;
-                direction -= transform.up * (m_SkinWidth - COLLIDER_OFFSET);
 
                 // Fix vertical collision overlaps.
                 Vector3 offset = HandleVerticalCollisions(direction, closestHit);
