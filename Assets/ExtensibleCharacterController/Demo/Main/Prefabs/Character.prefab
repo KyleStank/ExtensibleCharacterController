@@ -245,7 +245,7 @@ MonoBehaviour:
     m_Variable: {fileID: 0}
   m_GroundRadius:
     m_UseConstantValue: 1
-    m_ConstantValue: 1.25
+    m_ConstantValue: 1.1
     m_Variable: {fileID: 0}
   m_GroundOffset:
     m_UseConstantValue: 1
@@ -257,7 +257,7 @@ MonoBehaviour:
     m_Variable: {fileID: 0}
   m_SkinWidth:
     m_UseConstantValue: 1
-    m_ConstantValue: 0.4
+    m_ConstantValue: 0.2
     m_Variable: {fileID: 0}
   m_MaxSlopeAngle:
     m_UseConstantValue: 1

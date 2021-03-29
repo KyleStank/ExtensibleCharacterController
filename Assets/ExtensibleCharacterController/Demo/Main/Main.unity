@@ -10413,14 +10413,6 @@ PrefabInstance:
   m_Modification:
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 279154574, guid: 1952abc1557af4b44bc45626c631c10b, type: 3}
-      propertyPath: m_Gravity.m_ConstantValue
-      value: 9
-      objectReference: {fileID: 0}
-    - target: {fileID: 279154574, guid: 1952abc1557af4b44bc45626c631c10b, type: 3}
-      propertyPath: m_SkinWidth.m_ConstantValue
-      value: 0.4
-      objectReference: {fileID: 0}
     - target: {fileID: 6384343835097644696, guid: 1952abc1557af4b44bc45626c631c10b,
         type: 3}
       propertyPath: m_RootOrder
@@ -10434,7 +10426,7 @@ PrefabInstance:
     - target: {fileID: 6384343835097644696, guid: 1952abc1557af4b44bc45626c631c10b,
         type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.267
+      value: 0.33
       objectReference: {fileID: 0}
     - target: {fileID: 6384343835097644696, guid: 1952abc1557af4b44bc45626c631c10b,
         type: 3}

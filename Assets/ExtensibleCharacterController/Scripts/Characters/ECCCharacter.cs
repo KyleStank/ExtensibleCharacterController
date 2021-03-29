@@ -151,168 +151,10 @@ namespace ExtensibleCharacterController.Characters
             mouseY = Input.GetAxis("Mouse Y");
         }
 
-        private void DrawGroundCheck()
-        {
-            Color tempColor = Gizmos.color;
-
-            Vector3 moveDirection = m_MoveDirection;
-            m_Collider = m_Collider ? m_Collider : GetComponentInChildren<CapsuleCollider>();
-            m_Collider.radius += COLLIDER_OFFSET;
-
-            // Calculate half of the height, including scale and skin width.
-            float heightScale = ECCColliderHelper.GetCapsuleHeightScale(m_Collider);
-            float adjustedHalfHeight = (m_Collider.height / 2.0f) + m_SkinWidth;
-            float scaledHalfHeight = adjustedHalfHeight * heightScale;
-            Vector3 direction = ECCColliderHelper.GetCapsuleDirection(m_Collider);
-
-            // Calculate a capsule position that covers the TOP half of the CapsuleCollider.
-            // Since the adjusted half height is used as the full height, we need to half it one more time.
-            Vector3 topHalfCapsulePos = m_Collider.transform.position
-                + (direction * (scaledHalfHeight / 2.0f))
-                + (m_Collider.transform.InverseTransformDirection(moveDirection));
-            ECCColliderHelper.CalculateCapsuleCaps(
-                m_Collider,
-                topHalfCapsulePos,
-                m_Collider.transform.rotation,
-                out Vector3 topCapStart,
-                out Vector3 topCapEnd,
-                adjustedHalfHeight,
-                m_Collider.radius * m_GroundRadius
-            );
-
-            RaycastHit[] hits = Physics.CapsuleCastAll(
-                topCapStart,
-                topCapEnd,
-                m_Collider.radius * m_GroundRadius,
-                -direction,
-                scaledHalfHeight,
-                ~m_CharacterLayer.value
-            );
-
-            for (int i = 0; i < hits.Length; i++)
-            {
-                RaycastHit hit = hits[i];
-
-                Gizmos.color = Color.cyan;
-                Gizmos.DrawSphere(hit.point, 0.1f);
-                Vector3 closestPoint = m_Collider.ClosestPoint(hit.point);
-                Gizmos.DrawWireSphere(closestPoint, 0.1f);
-                Gizmos.DrawWireSphere(transform.TransformPoint(transform.position - closestPoint), 0.1f);
-            }
-
-            // Draw bottom half.
-            DrawWireCapsule(
-                topHalfCapsulePos,
-                m_Collider.transform.rotation,
-                m_Collider.radius * m_GroundRadius,
-                scaledHalfHeight,
-                Color.green
-            );
-            DrawWireCapsule(
-                topHalfCapsulePos - (direction * (1.0f + m_SkinWidth)),
-                m_Collider.transform.rotation,
-                m_Collider.radius * m_GroundRadius,
-                scaledHalfHeight,
-                Color.green
-            );
-
-
-            // if (CheckForGround(moveDirection, out RaycastHit closestHit, out Vector3 bottomHalfCapsulePos, out Vector3 topHalfCapsulePos))
-            // {
-            //     // Correct collision.
-            //     bool overlapped = Physics.ComputePenetration(
-            //         m_Collider, m_Collider.transform.position, m_Collider.transform.rotation,
-            //         closestHit.collider, closestHit.transform.position, closestHit.transform.rotation,
-            //         out Vector3 dir, out float dis
-            //     );
-            //     if (overlapped && dis > 0.001f)
-            //     {
-            //         moveDirection += (direction * (1.0f - m_SkinWidth)) * dis;
-            //     }
-
-            //     // Draw normal hit.
-            //     tempColor = Gizmos.color;
-            //     Gizmos.color = Color.cyan;
-            //     Gizmos.DrawRay(closestHit.point, closestHit.normal * 3.0f);
-
-            //     // Draw ground cast collision points.
-            //     tempColor = Gizmos.color;
-            //     Gizmos.color = Color.cyan;
-            //     Vector3 closestPoint = m_Collider.ClosestPoint(closestHit.point);
-            //     Gizmos.DrawWireSphere(closestPoint, 0.1f);
-            //     Gizmos.DrawSphere(closestHit.point, 0.1f);
-            //     Gizmos.color = tempColor;
-
-            //     // Draw top half.
-            //     DrawWireCapsule(
-            //         topHalfCapsulePos,
-            //         m_Collider.transform.rotation,
-            //         m_Collider.radius,
-            //         scaledHalfHeight,
-            //         Color.cyan
-            //     );
-
-            //     // Draw bottom half.
-            //     DrawWireCapsule(
-            //         bottomHalfCapsulePos,
-            //         m_Collider.transform.rotation,
-            //         m_Collider.radius,
-            //         scaledHalfHeight,
-            //         Color.red
-            //     );
-            // }
-            // else
-            // {
-            //     // Draw bottom half.
-            //     DrawWireCapsule(
-            //         bottomHalfCapsulePos,
-            //         m_Collider.transform.rotation,
-            //         m_Collider.radius,
-            //         scaledHalfHeight,
-            //         Color.green
-            //     );
-            // }
-
-            m_Collider.radius -= COLLIDER_OFFSET;
-        }
-
-        private void HandleVerticalCollisions(ref Vector3 moveDirection)
-        {
-            m_Collider.radius += COLLIDER_OFFSET;
-
-            // Check for the ground before doing anything else.
-            m_IsGrounded = CheckForGround(moveDirection, out RaycastHit closestHit);
-            Vector3 offset = Vector3.zero;
-            if (m_IsGrounded)
-            {
-                // Correct collision.
-                bool overlapped = Physics.ComputePenetration(
-                    m_Collider, m_Collider.transform.position, m_Collider.transform.rotation,
-                    closestHit.collider, closestHit.transform.position, closestHit.transform.rotation,
-                    out Vector3 direction, out float distance
-                );
-                if (overlapped && distance > 0.001f)
-                {
-                    offset += (direction * (1.0f + m_SkinWidth)) * distance;
-                }
-            }
-
-            // Vector3 closestPoint = m_Collider.ClosestPoint(closestHit.point);
-            // Vector3 v = Vector3.ProjectOnPlane((m_Rigidbody.position - closestPoint) + (moveDirection + offset), closestHit.normal).normalized;
-            // Debug.DrawRay(transform.TransformPoint((m_Rigidbody.position - closestPoint) + (moveDirection + offset)), v * 3.0f, Color.cyan);
-
-            Vector3 directionNormal = Vector3.ProjectOnPlane(moveDirection, closestHit.normal);
-            moveDirection = directionNormal.normalized * moveDirection.magnitude;
-            // moveDirection += offset + (directionNormal - directionNormal);
-            Debug.DrawRay(m_Rigidbody.position + moveDirection, directionNormal.normalized * 3.0f, Color.cyan);
-
-            m_Collider.radius -= COLLIDER_OFFSET;
-        }
-
-        private bool CheckForGround(Vector3 moveDirection, out RaycastHit closestHit, out Vector3 bottomHalfCapsulePos, out Vector3 topHalfCapsulePos)
+        private bool CheckForGround(Vector3 moveDirection, out RaycastHit closestHit)
         {
             closestHit = default(RaycastHit);
-            topHalfCapsulePos = Vector3.zero;
+            Vector3 topHalfCapsulePos = Vector3.zero;
 
             // Get direction of capsule and calculate half of the height, including scale and skin width.
             float heightScale = ECCColliderHelper.GetCapsuleHeightScale(m_Collider);
@@ -322,7 +164,7 @@ namespace ExtensibleCharacterController.Characters
 
             // Calculate a position for the ground check at the BOTTOM half of the CapsuleCollider.
             // Since the adjusted half height is used as the full height, we need to half it one more time.
-            bottomHalfCapsulePos = m_Collider.transform.position
+            Vector3 bottomHalfCapsulePos = m_Collider.transform.position
                 - (direction * (scaledHalfHeight / 2.0f))
                 + (m_Collider.transform.InverseTransformDirection(moveDirection));
             ECCColliderHelper.CalculateCapsuleCaps(
@@ -339,7 +181,7 @@ namespace ExtensibleCharacterController.Characters
             if (grounded)
             {
                 // Perform CapsuleCast to check if the collision is actually the ground.
-                RaycastHit[] hits = PerformGroundCast(moveDirection, out topHalfCapsulePos);
+                RaycastHit[] hits = PerformGroundCast(moveDirection);
                 if (hits.Length > 0)
                 {
                     closestHit.distance = 999.0f;
@@ -371,12 +213,7 @@ namespace ExtensibleCharacterController.Characters
             return grounded;
         }
 
-        private bool CheckForGround(Vector3 moveDirection, out RaycastHit closestHit)
-        {
-            return CheckForGround(moveDirection, out closestHit, out Vector3 bottomHalfCapsulePos, out Vector3 topHalfCapsulePos);
-        }
-
-        private RaycastHit[] PerformGroundCast(Vector3 moveDirection, out Vector3 topHalfCapsulePos)
+        private RaycastHit[] PerformGroundCast(Vector3 moveDirection)
         {
             // Get direction of capsule and calculate half of the height, including scale and skin width.
             float heightScale = ECCColliderHelper.GetCapsuleHeightScale(m_Collider);
@@ -386,7 +223,7 @@ namespace ExtensibleCharacterController.Characters
 
             // Calculate a capsule position that covers the TOP half of the CapsuleCollider.
             // Since the adjusted half height is used as the full height, we need to half it one more time.
-            topHalfCapsulePos = m_Collider.transform.position
+            Vector3 topHalfCapsulePos = m_Collider.transform.position
                 + (direction * (scaledHalfHeight / 2.0f))
                 + (m_Collider.transform.InverseTransformDirection(moveDirection));
             ECCColliderHelper.CalculateCapsuleCaps(
@@ -410,27 +247,63 @@ namespace ExtensibleCharacterController.Characters
             );
         }
 
-        private RaycastHit[] PerformGroundCast(Vector3 moveDirection)
-        {
-            return PerformGroundCast(moveDirection, out Vector3 topHalfCapsulePos);
-        }
-
         private void FixedUpdate()
         {
             // Apply gravity.
-            if (!m_IsGrounded && m_UseGravity)
-            {
-                m_MoveDirection += m_GravityDirection * m_Gravity;
-                Debug.Log("Apply gravity!");
-            }
+            m_MoveDirection = !m_IsGrounded && m_UseGravity ?
+                m_MoveDirection + (m_GravityDirection * m_Gravity) :
+                m_MoveDirection;
 
             // TODO: Test movement and rotation. Move elsewhere sometime.
             m_Rigidbody.rotation = GetMovementRotation(m_Rigidbody.rotation.eulerAngles);
-            m_MoveDirection = GetHorizontalPosition(m_MoveDirection);
+            m_MoveDirection += GetHorizontalPosition(m_MoveDirection);
 
-            // HandleVerticalCollisions(ref m_MovementDirection);
+            m_MoveDirection += CreateGroundMoveDirection(m_MoveDirection);
 
-            // TODO: Move ground stuff...
+            m_MoveDirection += HandleVerticalCollisions(m_MoveDirection);
+
+            // Apply new updated position.
+            m_Rigidbody.MovePosition(m_Rigidbody.position + (m_MoveDirection * Time.fixedDeltaTime));
+            m_MoveDirection = Vector3.zero;
+        }
+
+        private Quaternion GetMovementRotation(Vector3 rotation)
+        {
+            rotation.y = Camera.main.transform.eulerAngles.y;
+            return Quaternion.Euler(rotation);
+        }
+
+        private Vector3 GetHorizontalPosition(Vector3 moveDirection)
+        {
+            Vector3 direction = Vector3.zero;
+
+            // TODO: Test input. Again, put elsewhere.
+            Vector3 input = new Vector3(horizontal, 0.0f, vertical);
+            direction += (m_Rigidbody.rotation * input).normalized * 5.0f;
+
+            // m_Collider.radius += COLLIDER_OFFSET;
+
+            // Vector3 center, capStart, capEnd;
+            // ECCColliderHelper.CalculateCapsuleCaps(
+            //     m_Collider,
+            //     m_Collider.transform.position + (transform.up * COLLIDER_OFFSET),
+            //     m_Collider.transform.rotation,
+            //     out center,
+            //     out capStart,
+            //     out capEnd
+            // );
+
+            // m_Collider.radius -= COLLIDER_OFFSET;
+
+            return direction;
+        }
+
+        private Vector3 CreateGroundMoveDirection(Vector3 moveDirection)
+        {
+            Vector3 direction = Vector3.zero;
+
+            m_Collider.radius += COLLIDER_OFFSET;
+
             RaycastHit[] hits = PerformGroundCast(Vector3.zero); // Multiply by delta time to find "next frame" direction.
             List<RaycastHit> validHits = new List<RaycastHit>();
             for (int i = 0; i < hits.Length; i++)
@@ -455,57 +328,53 @@ namespace ExtensibleCharacterController.Characters
                     }
                 }
 
+                /**
+                  * TODO: Fix character "jumping" over top of slope.
+                  * Since m_SkinWidth is not used here, sometimes the CapsuleCast will miss a collider and gravity will turn back on.
+                  * This will make the character "jump" over the top of a slope.
+                  * Only a concern for slopes with high angles.
+                  */
                 // Get the normal of the hit that will rotate with the character. Used to create a direction that is up or down any angle.
                 Vector3 hitNormal = Vector3.ProjectOnPlane(closestHit.normal, transform.right).normalized;
 
                 // Create a target direction that gets the orthogonal direction from the hitNormal and horizontalMoveDirection,
                 // and then gets another orthogonal direction from that in which is placed on the surface in the correct orientation.
-                Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MoveDirection, transform.up);
+                Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(moveDirection, transform.up);
                 Vector3 targetDirection = -Vector3.Cross( // Make negative because this returns a backwards direction.
                     closestHit.normal,
                     Vector3.Cross(hitNormal, horizontalMoveDirection.normalized).normalized
                 ).normalized;
 
                 // Exclude horizontal move direction to prevent wrong speed or directions.
-                m_MoveDirection += (targetDirection * horizontalMoveDirection.magnitude) - horizontalMoveDirection;
+                direction += (targetDirection * horizontalMoveDirection.magnitude) - horizontalMoveDirection;
             }
             else
             {
                 m_IsGrounded = false;
             }
 
-            // Apply new updated position.
-            m_Rigidbody.MovePosition(m_Rigidbody.position + (m_MoveDirection * Time.fixedDeltaTime));
-            m_MoveDirection = Vector3.zero;
+            m_Collider.radius -= COLLIDER_OFFSET;
+
+            return direction;
         }
 
-        private Quaternion GetMovementRotation(Vector3 rotation)
+        private Vector3 HandleVerticalCollisions(Vector3 moveDirection)
         {
-            rotation.y = Camera.main.transform.eulerAngles.y;
-            return Quaternion.Euler(rotation);
-        }
+            Vector3 direction = Vector3.zero;
 
-        private Vector3 GetHorizontalPosition(Vector3 moveDirection)
-        {
-            // TODO: Test input. Again, put elsewhere.
-            Vector3 input = new Vector3(horizontal, 0.0f, vertical);
-            moveDirection += (m_Rigidbody.rotation * input).normalized * 5.0f;
-
-            // m_Collider.radius += COLLIDER_OFFSET;
-
-            // Vector3 center, capStart, capEnd;
-            // ECCColliderHelper.CalculateCapsuleCaps(
-            //     m_Collider,
-            //     m_Collider.transform.position + (transform.up * COLLIDER_OFFSET),
-            //     m_Collider.transform.rotation,
-            //     out center,
-            //     out capStart,
-            //     out capEnd
+            // Vector3 direction;
+            // float distance;
+            // bool overlapped = Physics.ComputePenetration(
+            //     m_Collider, m_Collider.transform.position, m_Collider.transform.rotation,
+            //     hitCollider, hitCollider.transform.position, hitCollider.transform.rotation,
+            //     out direction, out distance
             // );
+            // if (overlapped && distance >= 0.001f) // Account for float precision errors.
+            // {
+            //     overlapCorrectionOffset += direction * distance;
+            // }
 
-            // m_Collider.radius -= COLLIDER_OFFSET;
-
-            return moveDirection;
+            return direction;
         }
 
         private Vector3 GetGroundCheckPosition(Vector3 moveDirection, out bool grounded)
@@ -612,132 +481,72 @@ namespace ExtensibleCharacterController.Characters
             m_Collider.radius -= COLLIDER_OFFSET;
         }
 
-        // private void DrawGroundCheck()
-        // {
-        //     Vector3 moveDirection = Vector3.zero;
-        //     m_Collider = m_Collider ? m_Collider : GetComponentInChildren<CapsuleCollider>();
-        //     m_Collider.radius += COLLIDER_OFFSET;
+        private void DrawGroundCheck()
+        {
+            Color tempColor = Gizmos.color;
 
-        //     Vector3 center, capStart, capEnd;
-        //     ECCColliderHelper.CalculateCapsuleCaps(
-        //         m_Collider,
-        //         m_Collider.transform.position + (transform.up * COLLIDER_OFFSET),
-        //         m_Collider.transform.rotation,
-        //         out center,
-        //         out capStart,
-        //         out capEnd
-        //     );
-        //     RaycastHit[] hits = ECCColliderHelper.CapsuleCastAll(
-        //         m_Collider,
-        //         Vector3.zero,
-        //         -transform.up,
-        //         m_CharacterLayer,
-        //         true
-        //     );
+            Vector3 moveDirection = m_MoveDirection;
+            m_Collider = m_Collider ? m_Collider : GetComponentInChildren<CapsuleCollider>();
+            m_Collider.radius += COLLIDER_OFFSET;
 
-        //     Vector3 overlapCorrectionOffset = Vector3.zero;
-        //     for (int i = 0; i < hits.Length; i++)
-        //     {
-        //         RaycastHit hit = hits[i];
+            // Calculate half of the height, including scale and skin width.
+            float heightScale = ECCColliderHelper.GetCapsuleHeightScale(m_Collider);
+            float adjustedHalfHeight = (m_Collider.height / 2.0f) + m_SkinWidth;
+            float scaledHalfHeight = adjustedHalfHeight * heightScale;
+            Vector3 direction = ECCColliderHelper.GetCapsuleDirection(m_Collider);
 
-        //         // Draw hit point normal.
-        //         // Gizmos.color = Color.cyan;
-        //         // RaycastHit normalHit;
-        //         // if (Physics.Raycast(center, -transform.up, out normalHit, m_GroundDistance, ~m_CharacterLayer.value))
-        //         // {
-        //         //     Gizmos.DrawRay(normalHit.point, normalHit.normal * 3.0f);
-        //         // }
+            // Calculate a capsule position that covers the TOP half of the CapsuleCollider.
+            // Since the adjusted half height is used as the full height, we need to half it one more time.
+            Vector3 topHalfCapsulePos = m_Collider.transform.position
+                + (direction * (scaledHalfHeight / 2.0f))
+                + (m_Collider.transform.InverseTransformDirection(moveDirection));
+            ECCColliderHelper.CalculateCapsuleCaps(
+                m_Collider,
+                topHalfCapsulePos,
+                m_Collider.transform.rotation,
+                out Vector3 topCapStart,
+                out Vector3 topCapEnd,
+                adjustedHalfHeight,
+                m_Collider.radius * m_GroundRadius
+            );
 
-        //         Gizmos.color = Color.cyan;
-        //         Gizmos.DrawRay(hit.point, hit.normal * 3.0f);
-        //         float angle = Vector3.Angle(hit.normal, transform.up);
-        //         if (angle > m_MaxSlopeAngle) continue;
-        //         // Debug.Log("Angle: " + angle);
-        //         // Debug.Log("Angle - 90: " + (1 + (1 - (angle / 90.0f))));
-        //         Gizmos.DrawRay(hit.point, (Quaternion.AngleAxis(angle, transform.up) * transform.up) * 3.0f);
+            RaycastHit[] hits = Physics.CapsuleCastAll(
+                topCapStart,
+                topCapEnd,
+                m_Collider.radius * m_GroundRadius,
+                -direction,
+                scaledHalfHeight,
+                ~m_CharacterLayer.value
+            );
+            for (int i = 0; i < hits.Length; i++)
+            {
+                RaycastHit hit = hits[i];
 
-        //         float dotAngle = Vector3.Dot(hit.normal, transform.up) * Mathf.Rad2Deg;
-        //         // Debug.Log("Dot Angle:" + dotAngle);
-        //         // Debug.Log("2: " + Vector3.Dot(transform.up, hit.normal) * Mathf.Rad2Deg);
+                Gizmos.color = Color.cyan;
+                Gizmos.DrawSphere(hit.point, 0.1f);
+                Vector3 closestPoint = m_Collider.ClosestPoint(hit.point);
+                Gizmos.DrawWireSphere(closestPoint, 0.1f);
+                Gizmos.DrawWireSphere(transform.TransformPoint(transform.position - closestPoint), 0.1f);
+            }
 
-        //         Vector3 cross = Vector3.Cross(hit.normal, transform.up);
-        //         // Debug.Log("Cross: " + cross);
-        //         // Debug.Log("Cross 2: " + Vector3.Dot(transform.TransformDirection(Vector3.Cross(transform.up, hit.normal)), transform.up));
+            // Draw bottom half.
+            DrawWireCapsule(
+                topHalfCapsulePos,
+                m_Collider.transform.rotation,
+                m_Collider.radius * m_GroundRadius,
+                scaledHalfHeight,
+                Color.green
+            );
+            DrawWireCapsule(
+                topHalfCapsulePos - (direction * (1.0f + m_SkinWidth)),
+                m_Collider.transform.rotation,
+                m_Collider.radius * m_GroundRadius,
+                scaledHalfHeight,
+                Color.green
+            );
 
-        //         Collider hitCollider = hit.collider;
-        //         if (hit.distance == 0)
-        //         {
-        //             Vector3 direction;
-        //             float distance;
-        //             bool overlapped = Physics.ComputePenetration(
-        //                 m_Collider, m_Collider.transform.position, m_Collider.transform.rotation,
-        //                 hitCollider, hitCollider.transform.position, hitCollider.transform.rotation,
-        //                 out direction, out distance
-        //             );
-        //             distance = distance <= COLLIDER_OFFSET ? 0.0f : distance; // Account for float precision errors.
-        //             if (overlapped && distance > 0.0f)
-        //             {
-        //                 overlapCorrectionOffset += direction * distance;
-        //             }
-        //         }
-
-        //         // Draw closest point.
-        //         Gizmos.color = Color.cyan;
-        //         Vector3 closestPoint = m_Collider.ClosestPoint(hit.point);
-        //         Vector3 localClosestPoint = transform.InverseTransformPoint(closestPoint);
-        //         // if (localClosestPoint.y > 0)
-        //         // {
-        //         //     Debug.Log("Up!");
-        //         // }
-        //         // else if (localClosestPoint.y < 0)
-        //         // {
-        //         //     Debug.Log("Down!");
-        //         // }
-        //         // else
-        //         // {
-        //         //     Debug.Log("Flat!");
-        //         // }
-        //         Gizmos.DrawSphere(hit.point, 0.1f);
-        //         Gizmos.DrawWireSphere(closestPoint, 0.1f);
-        //     }
-
-        //     // Check again for ground to ensure actually grounded.
-        //     float verticalOffset = 0.0f;
-        //     RaycastHit groundHit;
-        //     bool grounded = ECCColliderHelper.CapsuleCast(
-        //         m_Collider,
-        //         transform.up,
-        //         -transform.up * (1.0f + (m_SkinWidth * 2.0f)),
-        //         m_CharacterLayer,
-        //         out groundHit,
-        //         true
-        //     );
-        //     if (grounded)
-        //     {
-        //         Vector3 closestPoint = m_Collider.ClosestPoint(groundHit.point);
-        //         Vector3 distance = (groundHit.point - closestPoint);
-        //         verticalOffset = distance.y + m_SkinWidth + COLLIDER_OFFSET;
-
-        //         float groundAngle = Vector3.Angle(groundHit.normal, transform.up);
-        //         if (groundAngle > m_MaxSlopeAngle) verticalOffset = 0.0f;
-        //     }
-
-        //     moveDirection += overlapCorrectionOffset;
-        //     moveDirection.y += verticalOffset;
-
-        //     Gizmos.color = Color.yellow;
-        //     DrawWireCapsule(
-        //         (m_Collider.transform.position +
-        //         (center - m_Collider.transform.position - (transform.up * COLLIDER_OFFSET))) +
-        //         moveDirection,
-        //         transform.rotation,
-        //         m_Collider.radius,
-        //         m_Collider.height,
-        //         Color.yellow
-        //     );
-
-        //     m_Collider.radius -= COLLIDER_OFFSET;
-        // }
+            m_Collider.radius -= COLLIDER_OFFSET;
+        }
 
         private static void DrawWireCapsule(Vector3 _pos, Quaternion _rot, float _radius, float _height, Color _color = default(Color))
         {
