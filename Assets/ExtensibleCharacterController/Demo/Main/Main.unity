@@ -2651,13 +2651,13 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 418457678}
-  m_LocalRotation: {x: 0.02196105, y: -0.021961035, z: 0.706766, w: 0.7067654}
-  m_LocalPosition: {x: -2.513, y: 0.15, z: -28.971998}
-  m_LocalScale: {x: 0.5958602, y: 15.725726, z: 17.260567}
+  m_LocalRotation: {x: 0.09929654, y: -0.099296615, z: 0.7001007, w: 0.70009965}
+  m_LocalPosition: {x: -2.513, y: 0.33, z: -30.84}
+  m_LocalScale: {x: 0.5958602, y: 15.725726, z: 22.350706}
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 10
-  m_LocalEulerAnglesHint: {x: 3.56, y: 0, z: 90}
+  m_LocalEulerAnglesHint: {x: 16.145, y: 0, z: 90}
 --- !u!1 &435407833
 GameObject:
   m_ObjectHideFlags: 0
@@ -10455,17 +10455,17 @@ PrefabInstance:
     - target: {fileID: 6384343835097644696, guid: 1952abc1557af4b44bc45626c631c10b,
         type: 3}
       propertyPath: m_LocalPosition.x
-      value: -2.43
+      value: -2.7575374
       objectReference: {fileID: 0}
     - target: {fileID: 6384343835097644696, guid: 1952abc1557af4b44bc45626c631c10b,
         type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.515
+      value: 2.992
       objectReference: {fileID: 0}
     - target: {fileID: 6384343835097644696, guid: 1952abc1557af4b44bc45626c631c10b,
         type: 3}
       propertyPath: m_LocalPosition.z
-      value: -20.39
+      value: -36.478584
       objectReference: {fileID: 0}
     - target: {fileID: 6384343835097644696, guid: 1952abc1557af4b44bc45626c631c10b,
         type: 3}
@@ -11663,6 +11663,16 @@ PrefabInstance:
         type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7078281825477402356, guid: 3303d4fa24b126d4a84dd42da1bda267,
+        type: 3}
+      propertyPath: m_TopClamp.m_ConstantValue
+      value: 40
+      objectReference: {fileID: 0}
+    - target: {fileID: 7078281825477402356, guid: 3303d4fa24b126d4a84dd42da1bda267,
+        type: 3}
+      propertyPath: m_BottomClamp.m_ConstantValue
+      value: 40
       objectReference: {fileID: 0}
     - target: {fileID: 7499630730584593138, guid: 3303d4fa24b126d4a84dd42da1bda267,
         type: 3}

@@ -144,8 +144,8 @@ namespace ExtensibleCharacterController.Characters
         private void Update()
         {
             // TODO: Test input. Move elsewhere sometime.
-            horizontal = Input.GetAxis("Horizontal");
-            vertical = Input.GetAxis("Vertical");
+            horizontal = Input.GetAxisRaw("Horizontal");
+            vertical = Input.GetAxisRaw("Vertical");
 
             mouseX = Input.GetAxis("Mouse X");
             mouseY = Input.GetAxis("Mouse Y");
@@ -462,34 +462,48 @@ namespace ExtensibleCharacterController.Characters
                 // m_MovementDirection += (projectedMoveDirection - m_MovementDirection);
 
                 // Calculate the movement direction based on angles of collision. Could be a small slope or a right degree wall.
-                Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MovementDirection, transform.up); // Convert move direction to horizontal.
-                Debug.Log(horizontalMoveDirection);
-                Vector3 orthoHitNormal = Vector3.ProjectOnPlane(closestHit.normal, transform.up).normalized; // Return an orthogonal version of hit.normal.
-                Vector3 targetDirection = Vector3.Cross(orthoHitNormal, transform.up).normalized; // Return a orthogonal Vector based on the orthHitNormal and transform.up.
 
-                // Returns an orthogonal Vector that is pointing up or down. This is used to check if we are moving up or down a slope and/or angle.
-                Vector3 slopeDirection = Vector3.Cross(orthoHitNormal, horizontalMoveDirection).normalized;
-
-                bool movingDown = Vector3.Dot(slopeDirection, transform.up) > 0.0f;
-                if (movingDown)
+                // TODO: Vertical. Y & Z rotations affect it because the normal is transform.right, which uses the X axis.
+                Vector3 verticalMoveDirection = Vector3.ProjectOnPlane(m_MovementDirection, closestHit.normal);
+                Vector3 orthoHitNormal = Vector3.ProjectOnPlane(closestHit.normal, transform.right).normalized;
+                Vector3 targetDirection = Vector3.Cross(transform.right, closestHit.normal).normalized;
+                float dot = Vector3.Dot(transform.right, Vector3.Cross(verticalMoveDirection.normalized, orthoHitNormal.normalized));
+                if (dot > 0.0f)
                 {
                     targetDirection = -targetDirection;
                 }
 
-                // Draw hit normals.
-                Debug.DrawRay(closestHit.point, transform.up, Color.green); // Up direction "normal"
-                Debug.DrawRay(closestHit.point, orthoHitNormal, Color.green); // Orthogonal normal of regular hit.normal
-                Debug.DrawRay(closestHit.point, closestHit.normal, Color.green); // Regular hit.normal
-                Debug.DrawRay(transform.position, targetDirection, Color.magenta); // Target direction based on normals
+                // // Draw target direction & normals.
+                // Debug.DrawRay(transform.position, targetDirection, Color.magenta);
+                // Debug.DrawRay(transform.position, closestHit.normal, Color.green);
+                // Debug.DrawRay(transform.position, orthoHitNormal, Color.green);
+                // Debug.DrawRay(transform.position, transform.right, Color.green);
+                m_MovementDirection = (targetDirection * verticalMoveDirection.magnitude);
+
+                // // TODO: Horizontal direction.
+                // Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MovementDirection, transform.up); // Convert move direction to horizontal.
+                // Vector3 orthoHitNormal = Vector3.ProjectOnPlane(closestHit.normal, transform.up).normalized; // Return an orthogonal version of hit.normal.
+                // Vector3 targetDirection = Vector3.Cross(orthoHitNormal, transform.up).normalized; // Return a orthogonal Vector based on the orthHitNormal and transform.up.
+
+                // Vector3 slopeDirection = Vector3.Cross(orthoHitNormal, horizontalMoveDirection).normalized;
+                // bool movingDown = Vector3.Dot(slopeDirection, transform.up) > 0.0f;
+                // if (movingDown)
+                // {
+                //     targetDirection = -targetDirection;
+                // }
+
+                // Debug.DrawRay(transform.position, horizontalMoveDirection.normalized, Color.cyan);
+
+                // // Draw hit normals.
+                // Debug.DrawRay(closestHit.point, transform.up, Color.magenta); // Right direction "normal"
+                // Debug.DrawRay(closestHit.point, orthoHitNormal, Color.green); // Orthogonal normal of regular hit.normal
+                // Debug.DrawRay(closestHit.point, closestHit.normal, Color.green); // Regular hit.normal
+                // Debug.DrawRay(transform.position, targetDirection, Color.magenta); // Target direction based on normals
             }
             else
             {
                 m_IsGrounded = false;
             }
-
-            // // Debug.DrawRay(transform.position, m_MovementDirection.normalized * 3.0f, Color.cyan);
-            // Debug.Log(m_MovementDirection.y);
-            // Debug.Log(m_MovementDirection.x);
 
             // Apply new updated position.
             m_Rigidbody.MovePosition(m_Rigidbody.position + m_MovementDirection);
