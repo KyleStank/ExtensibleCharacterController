@@ -455,32 +455,19 @@ namespace ExtensibleCharacterController.Characters
                     }
                 }
 
-                // Create move direction that is forward on any surface (flat or sloped).
+                // Get the normal of the hit that will rotate with the character. Used to create a direction that is up or down any angle.
+                Vector3 hitNormal = Vector3.ProjectOnPlane(closestHit.normal, transform.right).normalized;
+
+                // Create a target direction that gets the orthogonal direction from the hitNormal and horizontalMoveDirection,
+                // and then gets another orthogonal direction from that in which is placed on the surface in the correct orientation.
                 Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MoveDirection, transform.up);
-                Vector3 orthoHitNormal = Vector3.ProjectOnPlane(closestHit.normal, transform.right).normalized;
-                Vector3 targetDirection = Vector3.Cross(transform.right, closestHit.normal).normalized;
+                Vector3 targetDirection = -Vector3.Cross( // Make negative because this returns a backwards direction.
+                    closestHit.normal,
+                    Vector3.Cross(hitNormal, horizontalMoveDirection.normalized).normalized
+                ).normalized;
 
+                // Exclude horizontal move direction to prevent wrong speed or directions.
                 m_MoveDirection += (targetDirection * horizontalMoveDirection.magnitude) - horizontalMoveDirection;
-
-                // // TODO: Horizontal direction.
-                // Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MovementDirection, transform.up); // Convert move direction to horizontal.
-                // Vector3 orthoHitNormal = Vector3.ProjectOnPlane(closestHit.normal, transform.up).normalized; // Return an orthogonal version of hit.normal.
-                // Vector3 targetDirection = Vector3.Cross(orthoHitNormal, transform.up).normalized; // Return a orthogonal Vector based on the orthHitNormal and transform.up.
-
-                // Vector3 slopeDirection = Vector3.Cross(orthoHitNormal, horizontalMoveDirection).normalized;
-                // bool movingDown = Vector3.Dot(slopeDirection, transform.up) > 0.0f;
-                // if (movingDown)
-                // {
-                //     targetDirection = -targetDirection;
-                // }
-
-                // Debug.DrawRay(transform.position, horizontalMoveDirection.normalized, Color.cyan);
-
-                // // Draw hit normals.
-                // Debug.DrawRay(closestHit.point, transform.up, Color.magenta); // Right direction "normal"
-                // Debug.DrawRay(closestHit.point, orthoHitNormal, Color.green); // Orthogonal normal of regular hit.normal
-                // Debug.DrawRay(closestHit.point, closestHit.normal, Color.green); // Regular hit.normal
-                // Debug.DrawRay(transform.position, targetDirection, Color.magenta); // Target direction based on normals
             }
             else
             {
@@ -497,11 +484,6 @@ namespace ExtensibleCharacterController.Characters
             rotation.y = Camera.main.transform.eulerAngles.y;
             return Quaternion.Euler(rotation);
         }
-
-        // private Vector3 GetGravityPosition(Vector3 moveDirection, Vector3 direction)
-        // {
-        //     return moveDirection + (direction * m_Gravity);
-        // }
 
         private Vector3 GetHorizontalPosition(Vector3 moveDirection)
         {
@@ -786,3 +768,28 @@ namespace ExtensibleCharacterController.Characters
         #endif
     }
 }
+
+// TODO: Old reference code that may be useful.
+// *************************************************************************
+// * Creates a horizontal target direction from a hit surface.             *
+// * The direction is oriented from the surface normal, not the character. *
+// * If used, make sure to account for that oritentation difference.       *
+// *************************************************************************
+// Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MovementDirection, transform.up); // Convert move direction to horizontal.
+// Vector3 orthoHitNormal = Vector3.ProjectOnPlane(closestHit.normal, transform.up).normalized; // Return an orthogonal version of hit.normal.
+// Vector3 targetDirection = Vector3.Cross(orthoHitNormal, transform.up).normalized; // Return a orthogonal Vector based on the orthHitNormal and transform.up.
+
+// Vector3 slopeDirection = Vector3.Cross(orthoHitNormal, horizontalMoveDirection).normalized;
+// bool movingDown = Vector3.Dot(slopeDirection, transform.up) > 0.0f;
+// if (movingDown)
+// {
+//     targetDirection = -targetDirection;
+// }
+
+// Debug.DrawRay(transform.position, horizontalMoveDirection.normalized, Color.cyan);
+
+// // Draw hit normals.
+// Debug.DrawRay(closestHit.point, transform.up, Color.magenta); // Right direction "normal"
+// Debug.DrawRay(closestHit.point, orthoHitNormal, Color.green); // Orthogonal normal of regular hit.normal
+// Debug.DrawRay(closestHit.point, closestHit.normal, Color.green); // Regular hit.normal
+// Debug.DrawRay(transform.position, targetDirection, Color.magenta); // Target direction based on normals
