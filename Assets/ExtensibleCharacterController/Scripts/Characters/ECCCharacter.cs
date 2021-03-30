@@ -246,10 +246,9 @@ namespace ExtensibleCharacterController.Characters
             List<RaycastHit> validHits = new List<RaycastHit>();
             for (int i = 0; i < hits.Length; i++)
             {
-                // If collider has any overlaps, move the character in the direction of the hit normal.
-                // If overlap direction is used instead, sometimes glitches appear while walking over hard surface angles.
+                // If collider has any overlaps, find the direction to seperate the overlap and move the character accordingly.
                 bool overlapped = IsOverlapped(hits[i].collider, Vector3.zero, out Vector3 dir, out float distance);
-                direction += (hits[i].normal * distance * m_CollisionCorrectionSpeed);
+                direction += (dir * distance * m_CollisionCorrectionSpeed);
 
                 // Calculate slope. If it's greater than the maximum slope allowed, than we are not grounded.
                 float angle = Vector3.Angle(hits[i].normal, m_Collider.transform.up);
@@ -282,7 +281,7 @@ namespace ExtensibleCharacterController.Characters
 
                 // Create a target direction that gets the orthogonal direction from the hitNormal and horizontalMoveDirection,
                 // and then gets another orthogonal direction from that in which is placed on the surface in the correct orientation.
-                Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(moveDirection, transform.up);
+                Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(moveDirection + direction, transform.up);
                 Vector3 targetDirection = -Vector3.Cross( // Make negative because this returns a backwards direction.
                     closestHit.normal,
                     Vector3.Cross(hitNormal, horizontalMoveDirection.normalized).normalized
