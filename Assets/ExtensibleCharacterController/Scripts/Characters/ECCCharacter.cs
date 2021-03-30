@@ -26,6 +26,11 @@ namespace ExtensibleCharacterController.Characters
         [SerializeField]
         private ECCFloatReference m_Gravity = -Physics.gravity.y;
 
+        [Header("Collision Settings")]
+        [Tooltip("The speed at which the character's collider will seperate from an overlapped collider.")]
+        [SerializeField]
+        private ECCFloatReference m_CollisionCorrectionSpeed = 50.0f;
+
         // TODO: Move ground checking to a custom behaviour?
         [Header("Ground Settings")]
         [SerializeField]
@@ -57,8 +62,6 @@ namespace ExtensibleCharacterController.Characters
 
         private CapsuleCollider m_Collider = null;
         private Vector3 m_MoveDirection = Vector3.zero;
-        private Vector3 m_PrevPosition = Vector3.zero;
-        private Vector3 m_UpdatePosition = Vector3.zero;
         private Vector3 m_GravityDirection = -Vector3.up;
         private bool m_IsGrounded = false;
 
@@ -72,7 +75,6 @@ namespace ExtensibleCharacterController.Characters
             SetupRigidbody();
 
             m_Collider = GetComponentInChildren<CapsuleCollider>();
-            m_UpdatePosition = m_PrevPosition = m_Rigidbody.position;
             m_MoveDirection = Vector3.zero;
             m_GravityDirection = -transform.up;
 
@@ -198,8 +200,6 @@ namespace ExtensibleCharacterController.Characters
 
             m_MoveDirection += CreateGroundMoveDirection(m_MoveDirection);
 
-            Debug.Log(m_MoveDirection);
-
             // Apply new updated position.
             m_Rigidbody.MovePosition(m_Rigidbody.position + (m_MoveDirection * Time.fixedDeltaTime));
             m_MoveDirection = Vector3.zero;
@@ -242,10 +242,15 @@ namespace ExtensibleCharacterController.Characters
 
             m_Collider.radius += COLLIDER_OFFSET;
 
-            RaycastHit[] hits = PerformGroundCast(Vector3.zero); // Multiply by delta time to find "next frame" direction.
+            RaycastHit[] hits = PerformGroundCast(moveDirection * Time.fixedDeltaTime); // Multiply by delta time to find "next frame" direction.
             List<RaycastHit> validHits = new List<RaycastHit>();
             for (int i = 0; i < hits.Length; i++)
             {
+                // If collider has any overlaps, move the character in the direction of the hit normal.
+                // If overlap direction is used instead, sometimes glitches appear while walking over hard surface angles.
+                bool overlapped = IsOverlapped(hits[i].collider, Vector3.zero, out Vector3 dir, out float distance);
+                direction += (hits[i].normal * distance * m_CollisionCorrectionSpeed);
+
                 // Calculate slope. If it's greater than the maximum slope allowed, than we are not grounded.
                 float angle = Vector3.Angle(hits[i].normal, m_Collider.transform.up);
                 if (angle > m_MaxSlopeAngle) continue;
@@ -285,10 +290,6 @@ namespace ExtensibleCharacterController.Characters
 
                 // Exclude horizontal move direction to prevent wrong speed or directions.
                 direction += (targetDirection * horizontalMoveDirection.magnitude) - horizontalMoveDirection;
-
-                // Fix vertical collision overlaps.
-                Vector3 offset = HandleVerticalCollisions(direction, closestHit);
-                direction += offset;
             }
             else
             {
@@ -300,22 +301,17 @@ namespace ExtensibleCharacterController.Characters
             return direction;
         }
 
-        private Vector3 HandleVerticalCollisions(Vector3 offset, RaycastHit hit)
+        private bool IsOverlapped(Collider collider, Vector3 offset, out Vector3 direction, out float distance)
         {
             Vector3 dir = Vector3.zero;
-            Collider hitCollider = hit.collider;
 
             bool overlapped = Physics.ComputePenetration(
                 m_Collider, m_Collider.transform.position + offset, m_Collider.transform.rotation,
-                hitCollider, hitCollider.transform.position, hitCollider.transform.rotation,
-                out Vector3 direction, out float distance
+                collider, collider.transform.position, collider.transform.rotation,
+                out direction, out distance
             );
-            if (overlapped && distance >= 0.001f) // Account for float precision errors.
-            {
-                dir += direction.normalized * (distance);
-            }
 
-            return dir;
+            return overlapped;
         }
 
         #if UNITY_EDITOR
