@@ -378,10 +378,9 @@ namespace ExtensibleCharacterController.Characters
                 RaycastHit hit = hits[i];
 
                 Gizmos.color = Color.cyan;
-                Gizmos.DrawSphere(hit.point, 0.1f);
                 Vector3 closestPoint = m_Collider.ClosestPoint(hit.point);
+                Gizmos.DrawSphere(hit.point, 0.1f);
                 Gizmos.DrawWireSphere(closestPoint, 0.1f);
-                Gizmos.DrawWireSphere(transform.TransformPoint(transform.position - closestPoint), 0.1f);
             }
 
             // Draw bottom half.
