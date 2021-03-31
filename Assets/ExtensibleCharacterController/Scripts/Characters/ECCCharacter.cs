@@ -30,6 +30,8 @@ namespace ExtensibleCharacterController.Characters
         [Tooltip("The speed at which the character's collider will seperate from an overlapped collider.")]
         [SerializeField]
         private ECCFloatReference m_CollisionCorrectionSpeed = 50.0f;
+        [SerializeField]
+        private ECCIntReference m_MaxCollisions = 10;
 
         // TODO: Move ground checking to a custom behaviour?
         [Header("Ground Settings")]
@@ -61,12 +63,16 @@ namespace ExtensibleCharacterController.Characters
         }
 
         private CapsuleCollider m_Collider = null;
+        private RaycastHit[] m_RaycastHits;
+
         private Vector3 m_MoveDirection = Vector3.zero;
         private Vector3 m_GravityDirection = -Vector3.up;
         private bool m_IsGrounded = false;
 
         protected override void Initialize()
         {
+            m_RaycastHits = new RaycastHit[m_MaxCollisions];
+
             // TODO: Create custom inspector that adds through dropdown rather than manual string type names.
             // TODO: Create custom inspector to drag and order the priority of each behaviour.
             m_CharacterBehaviours = FindCharacterBehaviours();
@@ -153,40 +159,6 @@ namespace ExtensibleCharacterController.Characters
             mouseY = Input.GetAxis("Mouse Y");
         }
 
-        private RaycastHit[] PerformGroundCast(Vector3 moveDirection)
-        {
-            // Get direction of capsule and calculate half of the height, including scale and skin width.
-            float heightScale = ECCColliderHelper.GetCapsuleHeightScale(m_Collider);
-            float adjustedHalfHeight = (m_Collider.height / 2.0f) + m_SkinWidth;
-            float scaledHalfHeight = adjustedHalfHeight * heightScale;
-            Vector3 direction = ECCColliderHelper.GetCapsuleDirection(m_Collider);
-
-            // Calculate a capsule position that covers the TOP half of the CapsuleCollider.
-            // Since the adjusted half height is used as the full height, we need to half it one more time.
-            Vector3 topHalfCapsulePos = m_Collider.transform.position
-                + (direction * (scaledHalfHeight / 2.0f))
-                + (m_Collider.transform.InverseTransformDirection(moveDirection));
-            ECCColliderHelper.CalculateCapsuleCaps(
-                m_Collider,
-                topHalfCapsulePos,
-                m_Collider.transform.rotation,
-                out Vector3 topCapStart,
-                out Vector3 topCapEnd,
-                adjustedHalfHeight,
-                (m_Collider.radius + COLLIDER_OFFSET) * m_GroundRadius
-            );
-
-            // Shoot the CapsuleCast in the inverse direction of the capsule from the top half position.
-            return Physics.CapsuleCastAll(
-                topCapStart,
-                topCapEnd,
-                (m_Collider.radius + COLLIDER_OFFSET) * m_GroundRadius,
-                -direction,
-                scaledHalfHeight,
-                ~m_CharacterLayer.value
-            );
-        }
-
         private void FixedUpdate()
         {
             // Apply gravity.
@@ -196,12 +168,16 @@ namespace ExtensibleCharacterController.Characters
 
             // TODO: Test movement and rotation. Move elsewhere sometime.
             m_Rigidbody.rotation = GetMovementRotation(m_Rigidbody.rotation.eulerAngles);
-            m_MoveDirection += GetHorizontalPosition(m_MoveDirection);
+
+            Vector3 moveDirInput = GetHorizontalPosition();
+            m_Collider.radius += COLLIDER_OFFSET;
+            m_MoveDirection += CheckHorizontalCollisions(m_MoveDirection + moveDirInput);
+            m_Collider.radius -= COLLIDER_OFFSET;
 
             m_MoveDirection += CreateGroundMoveDirection(m_MoveDirection);
 
             // Apply new updated position.
-            m_Rigidbody.MovePosition(m_Rigidbody.position + (m_MoveDirection * Time.fixedDeltaTime));
+            // m_Rigidbody.MovePosition(m_Rigidbody.position + (m_MoveDirection * Time.fixedDeltaTime));
             m_MoveDirection = Vector3.zero;
         }
 
@@ -211,7 +187,7 @@ namespace ExtensibleCharacterController.Characters
             return Quaternion.Euler(rotation);
         }
 
-        private Vector3 GetHorizontalPosition(Vector3 moveDirection)
+        private Vector3 GetHorizontalPosition()
         {
             Vector3 direction = Vector3.zero;
 
@@ -219,21 +195,37 @@ namespace ExtensibleCharacterController.Characters
             Vector3 input = new Vector3(horizontal, 0.0f, vertical);
             direction += (m_Rigidbody.rotation * input).normalized * 5.0f;
 
-            // m_Collider.radius += COLLIDER_OFFSET;
-
-            // Vector3 center, capStart, capEnd;
-            // ECCColliderHelper.CalculateCapsuleCaps(
-            //     m_Collider,
-            //     m_Collider.transform.position + (transform.up * COLLIDER_OFFSET),
-            //     m_Collider.transform.rotation,
-            //     out center,
-            //     out capStart,
-            //     out capEnd
-            // );
-
-            // m_Collider.radius -= COLLIDER_OFFSET;
-
             return direction;
+        }
+
+        private Vector3 CheckHorizontalCollisions(Vector3 moveDirection)
+        {
+            Vector3 direction = Vector3.zero;
+
+            // TODO: Finish horizontal collision detection stuff.
+            int amountHit = NonAllocCapsuleCast(
+                m_Collider,
+                m_Collider.transform.position,
+                m_Collider.transform.rotation,
+                m_Collider.radius,
+                moveDirection,
+                ref m_RaycastHits
+            );
+            Debug.DrawRay(m_Collider.transform.position, moveDirection.normalized * moveDirection.magnitude, Color.magenta);
+            if (amountHit == 0)
+            {
+                return Vector3.zero;
+            }
+
+            for (byte i = 0; i < amountHit; i++)
+            {
+                RaycastHit hit = m_RaycastHits[i];
+
+                Debug.DrawRay(hit.point, hit.normal, Color.cyan);
+                Debug.DrawRay(m_Collider.transform.position, hit.point - m_Collider.transform.position, Color.red);
+            }
+
+            return moveDirection;
         }
 
         private Vector3 CreateGroundMoveDirection(Vector3 moveDirection)
@@ -311,6 +303,60 @@ namespace ExtensibleCharacterController.Characters
             );
 
             return overlapped;
+        }
+
+        private RaycastHit[] PerformGroundCast(Vector3 moveDirection)
+        {
+            // Get direction of capsule and calculate half of the height, including scale and skin width.
+            float heightScale = ECCColliderHelper.GetCapsuleHeightScale(m_Collider);
+            float adjustedHalfHeight = (m_Collider.height / 2.0f) + m_SkinWidth;
+            float scaledHalfHeight = adjustedHalfHeight * heightScale;
+            Vector3 direction = ECCColliderHelper.GetCapsuleDirection(m_Collider);
+
+            // Calculate a capsule position that covers the TOP half of the CapsuleCollider.
+            // Since the adjusted half height is used as the full height, we need to half it one more time.
+            Vector3 topHalfCapsulePos = m_Collider.transform.position
+                + (direction * (scaledHalfHeight / 2.0f))
+                + (m_Collider.transform.InverseTransformDirection(moveDirection));
+            ECCColliderHelper.CalculateCapsuleCaps(
+                m_Collider,
+                topHalfCapsulePos,
+                m_Collider.transform.rotation,
+                out Vector3 topCapStart,
+                out Vector3 topCapEnd,
+                adjustedHalfHeight,
+                (m_Collider.radius + COLLIDER_OFFSET) * m_GroundRadius
+            );
+
+            // Shoot the CapsuleCast in the inverse direction of the capsule from the top half position.
+            return Physics.CapsuleCastAll(
+                topCapStart,
+                topCapEnd,
+                (m_Collider.radius + COLLIDER_OFFSET) * m_GroundRadius,
+                -direction,
+                scaledHalfHeight,
+                ~m_CharacterLayer.value
+            );
+        }
+
+        private int NonAllocCapsuleCast(
+            CapsuleCollider collider,
+            Vector3 position,
+            Quaternion rotation,
+            float radius,
+            Vector3 direction,
+            ref RaycastHit[] hits
+        )
+        {
+            ECCColliderHelper.CalculateCapsuleCaps(
+                collider,
+                position,
+                rotation,
+                out Vector3 capStart,
+                out Vector3 capEnd
+            );
+
+            return Physics.CapsuleCastNonAlloc(capStart, capEnd, radius, direction.normalized, hits, direction.magnitude, ~m_CharacterLayer.value);
         }
 
         #if UNITY_EDITOR
