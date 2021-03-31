@@ -169,6 +169,7 @@ GameObject:
   - component: {fileID: 6384343835097644696}
   - component: {fileID: 3544393312556234890}
   - component: {fileID: 279154574}
+  - component: {fileID: 4243156454373855708}
   m_Layer: 31
   m_Name: Character
   m_TagString: Player
@@ -247,17 +248,13 @@ MonoBehaviour:
     m_UseConstantValue: 1
     m_ConstantValue: 50
     m_Variable: {fileID: 0}
+  m_MaxCollisions:
+    m_UseConstantValue: 1
+    m_ConstantValue: 10
+    m_Variable: {fileID: 0}
   m_GroundRadius:
     m_UseConstantValue: 1
     m_ConstantValue: 1.1
-    m_Variable: {fileID: 0}
-  m_GroundOffset:
-    m_UseConstantValue: 1
-    m_ConstantValue: {x: 0, y: -0.39, z: 0}
-    m_Variable: {fileID: 0}
-  m_GroundDistance:
-    m_UseConstantValue: 1
-    m_ConstantValue: 2
     m_Variable: {fileID: 0}
   m_SkinWidth:
     m_UseConstantValue: 1
@@ -269,3 +266,16 @@ MonoBehaviour:
     m_Variable: {fileID: 0}
   m_CharacterBehaviourNames:
   - ECCMovementBehaviour
+--- !u!114 &4243156454373855708
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6384343835097644697}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cffc492ab2d9ddb40a83ec12b0a9dbe8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Speed: 5

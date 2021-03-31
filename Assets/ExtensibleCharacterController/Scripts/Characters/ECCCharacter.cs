@@ -33,14 +33,9 @@ namespace ExtensibleCharacterController.Characters
         [SerializeField]
         private ECCIntReference m_MaxCollisions = 10;
 
-        // TODO: Move ground checking to a custom behaviour?
         [Header("Ground Settings")]
         [SerializeField]
         private ECCFloatReference m_GroundRadius = 1.0f;
-        [SerializeField]
-        private ECCVector3Reference m_GroundOffset = Vector3.zero;
-        [SerializeField]
-        private ECCFloatReference m_GroundDistance = 1.0f;
         [SerializeField]
         private ECCFloatReference m_SkinWidth = 0.1f;
         [SerializeField]
@@ -67,7 +62,11 @@ namespace ExtensibleCharacterController.Characters
 
         private Vector3 m_MoveDirection = Vector3.zero;
         private Vector3 m_GravityDirection = -Vector3.up;
+        private float m_GravityFactor = 1.0f;
         private bool m_IsGrounded = false;
+        private IECCCharacterController m_Controller;
+        private Vector2 m_Input = Vector2.zero;
+        private Vector3 m_Motor = Vector3.zero;
 
         protected override void Initialize()
         {
@@ -83,6 +82,8 @@ namespace ExtensibleCharacterController.Characters
             m_Collider = GetComponentInChildren<CapsuleCollider>();
             m_MoveDirection = Vector3.zero;
             m_GravityDirection = -transform.up;
+
+            m_Controller = GetComponent<IECCCharacterController>();
 
             // TODO: Does not work in Runtime build. Fix.
             for (int i = 0; i < m_CharacterBehaviours.Count; i++)
@@ -145,73 +146,54 @@ namespace ExtensibleCharacterController.Characters
             m_Rigidbody.isKinematic = true;
         }
 
-        float horizontal;
-        float vertical;
-        float mouseX;
-        float mouseY;
         private void Update()
         {
-            // TODO: Test input. Move elsewhere sometime.
-            horizontal = Input.GetAxisRaw("Horizontal");
-            vertical = Input.GetAxisRaw("Vertical");
+            m_Input = m_Controller.GetInput();
 
-            mouseX = Input.GetAxis("Mouse X");
-            mouseY = Input.GetAxis("Mouse Y");
+            Vector2 input = m_Input.normalized * m_Input.magnitude;
+            m_Motor = transform.TransformDirection(input.x, 0.0f, input.y);
         }
 
         private void FixedUpdate()
         {
-            // Apply gravity.
-            m_MoveDirection = !m_IsGrounded && m_UseGravity ?
-                m_MoveDirection + (m_GravityDirection * m_Gravity) :
-                m_MoveDirection;
+            // TODO: Move elsewhere when ready.
+            Vector3 eulerRot = m_Rigidbody.rotation.eulerAngles;
+            eulerRot.y = Camera.main.transform.eulerAngles.y;
+            m_Rigidbody.rotation = Quaternion.Euler(eulerRot);
 
-            // TODO: Test movement and rotation. Move elsewhere sometime.
-            m_Rigidbody.rotation = GetMovementRotation(m_Rigidbody.rotation.eulerAngles);
+            // Apply forces.
+            m_MoveDirection += m_Motor + (m_UseGravity ? (m_GravityDirection * (m_Gravity * m_GravityFactor)) : Vector3.zero);
 
-            Vector3 moveDirInput = GetHorizontalPosition();
-            m_Collider.radius += COLLIDER_OFFSET;
-            m_MoveDirection += CheckHorizontalCollisions(m_MoveDirection + moveDirInput);
-            m_Collider.radius -= COLLIDER_OFFSET;
+            // Ensure movement over any collision is smooth and correct any overlaps.
+            HandleHorizontalCollisions();
+            HandleVerticalCollisions();
 
-            m_MoveDirection += CreateGroundMoveDirection(m_MoveDirection);
-
-            // Apply new updated position.
-            // m_Rigidbody.MovePosition(m_Rigidbody.position + (m_MoveDirection * Time.fixedDeltaTime));
+            // Move character after all calculations are completed.
+            // Make sure move direction is multiplied by delta time as the direction vector is too large for per-frame movement.
+            m_Rigidbody.MovePosition(m_Rigidbody.position + (m_MoveDirection * Time.fixedDeltaTime));
             m_MoveDirection = Vector3.zero;
         }
 
-        private Quaternion GetMovementRotation(Vector3 rotation)
+        private void HandleHorizontalCollisions()
         {
-            rotation.y = Camera.main.transform.eulerAngles.y;
-            return Quaternion.Euler(rotation);
-        }
-
-        private Vector3 GetHorizontalPosition()
-        {
-            Vector3 direction = Vector3.zero;
-
-            // TODO: Test input. Again, put elsewhere.
-            Vector3 input = new Vector3(horizontal, 0.0f, vertical);
-            direction += (m_Rigidbody.rotation * input).normalized * 5.0f;
-
-            return direction;
+            // TODO: Implement...
         }
 
         private Vector3 CheckHorizontalCollisions(Vector3 moveDirection)
         {
             Vector3 direction = Vector3.zero;
 
-            // TODO: Finish horizontal collision detection stuff.
+            Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(moveDirection, transform.up);
+            // Debug.Log(horizontalMoveDirection);
             int amountHit = NonAllocCapsuleCast(
                 m_Collider,
                 m_Collider.transform.position,
                 m_Collider.transform.rotation,
                 m_Collider.radius,
-                moveDirection,
+                horizontalMoveDirection,
                 ref m_RaycastHits
             );
-            Debug.DrawRay(m_Collider.transform.position, moveDirection.normalized * moveDirection.magnitude, Color.magenta);
+            Debug.DrawRay(m_Collider.transform.position, horizontalMoveDirection, Color.magenta);
             if (amountHit == 0)
             {
                 return Vector3.zero;
@@ -225,14 +207,18 @@ namespace ExtensibleCharacterController.Characters
                 Debug.DrawRay(m_Collider.transform.position, hit.point - m_Collider.transform.position, Color.red);
             }
 
-            return moveDirection;
+            return direction;
+        }
+
+        private void HandleVerticalCollisions()
+        {
+            Vector3 verticalMoveDirection = CreateGroundMoveDirection(m_MoveDirection);
+            m_MoveDirection += verticalMoveDirection;
         }
 
         private Vector3 CreateGroundMoveDirection(Vector3 moveDirection)
         {
             Vector3 direction = Vector3.zero;
-
-            m_Collider.radius += COLLIDER_OFFSET;
 
             RaycastHit[] hits = PerformGroundCast(moveDirection * Time.fixedDeltaTime); // Multiply by delta time to find "next frame" direction.
             List<RaycastHit> validHits = new List<RaycastHit>();
@@ -252,6 +238,7 @@ namespace ExtensibleCharacterController.Characters
             if (validHits.Count > 0)
             {
                 m_IsGrounded = true;
+                m_GravityFactor = 0.0f;
 
                 RaycastHit closestHit = validHits[0];
                 for (int i = 0; i < validHits.Count; ++i)
@@ -272,8 +259,8 @@ namespace ExtensibleCharacterController.Characters
                 Vector3 hitNormal = Vector3.ProjectOnPlane(closestHit.normal, transform.right).normalized;
 
                 // Create a target direction that gets the orthogonal direction from the hitNormal and horizontalMoveDirection,
-                // and then gets another orthogonal direction from that in which is placed on the surface in the correct orientation.
-                Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(moveDirection + direction, transform.up);
+                // and then gets another orthogonal direction that is placed on the surface in the correct orientation.
+                Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(moveDirection + direction, -m_GravityDirection);
                 Vector3 targetDirection = -Vector3.Cross( // Make negative because this returns a backwards direction.
                     closestHit.normal,
                     Vector3.Cross(hitNormal, horizontalMoveDirection.normalized).normalized
@@ -285,9 +272,8 @@ namespace ExtensibleCharacterController.Characters
             else
             {
                 m_IsGrounded = false;
+                m_GravityFactor = 1.0f;
             }
-
-            m_Collider.radius -= COLLIDER_OFFSET;
 
             return direction;
         }
@@ -307,6 +293,8 @@ namespace ExtensibleCharacterController.Characters
 
         private RaycastHit[] PerformGroundCast(Vector3 moveDirection)
         {
+            m_Collider.radius += COLLIDER_OFFSET;
+
             // Get direction of capsule and calculate half of the height, including scale and skin width.
             float heightScale = ECCColliderHelper.GetCapsuleHeightScale(m_Collider);
             float adjustedHalfHeight = (m_Collider.height / 2.0f) + m_SkinWidth;
@@ -329,7 +317,7 @@ namespace ExtensibleCharacterController.Characters
             );
 
             // Shoot the CapsuleCast in the inverse direction of the capsule from the top half position.
-            return Physics.CapsuleCastAll(
+            RaycastHit[] hits = Physics.CapsuleCastAll(
                 topCapStart,
                 topCapEnd,
                 (m_Collider.radius + COLLIDER_OFFSET) * m_GroundRadius,
@@ -337,6 +325,10 @@ namespace ExtensibleCharacterController.Characters
                 scaledHalfHeight,
                 ~m_CharacterLayer.value
             );
+
+            m_Collider.radius -= COLLIDER_OFFSET;
+
+            return hits;
         }
 
         private int NonAllocCapsuleCast(
