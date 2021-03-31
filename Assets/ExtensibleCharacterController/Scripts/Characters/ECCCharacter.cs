@@ -148,9 +148,9 @@ namespace ExtensibleCharacterController.Characters
 
         private void Update()
         {
-            m_Input = m_Controller.GetInput();
+            m_Input = m_Controller != null ? m_Controller.GetInput() : Vector2.zero;
 
-            Vector2 input = m_Input.normalized * m_Input.magnitude;
+            Vector2 input = m_Input.normalized * Mathf.Max(Mathf.Abs(m_Input.x), Mathf.Abs(m_Input.y));
             m_Motor = transform.TransformDirection(input.x, 0.0f, input.y);
         }
 
