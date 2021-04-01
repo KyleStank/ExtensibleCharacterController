@@ -39,6 +39,8 @@ namespace ExtensibleCharacterController.Characters
         [SerializeField]
         private ECCFloatReference m_SkinWidth = 0.1f;
         [SerializeField]
+        private ECCFloatReference m_MaxStep = 0.3f;
+        [SerializeField]
         private ECCFloatReference m_MaxSlopeAngle = 60.0f;
 
         [Header("Behaviours")]
@@ -144,13 +146,14 @@ namespace ExtensibleCharacterController.Characters
         {
             m_Rigidbody.useGravity = false;
             m_Rigidbody.isKinematic = true;
+            m_Rigidbody.constraints = RigidbodyConstraints.None;
         }
 
         private void Update()
         {
             m_Input = m_Controller != null ? m_Controller.GetInput() : Vector2.zero;
 
-            Vector2 input = m_Input.normalized * Mathf.Max(Mathf.Abs(m_Input.x), Mathf.Abs(m_Input.y));
+            Vector2 input = m_Input.normalized * Mathf.Max(Mathf.Abs(m_Input.x), Mathf.Abs(m_Input.y)) * Time.fixedDeltaTime;
             m_Motor = transform.TransformDirection(input.x, 0.0f, input.y);
         }
 
@@ -160,32 +163,28 @@ namespace ExtensibleCharacterController.Characters
             Vector3 eulerRot = m_Rigidbody.rotation.eulerAngles;
             eulerRot.y = Camera.main.transform.eulerAngles.y;
             m_Rigidbody.rotation = Quaternion.Euler(eulerRot);
+            m_GravityDirection = -transform.up;
 
             // Apply forces.
-            m_MoveDirection += m_Motor + (m_UseGravity ? (m_GravityDirection * (m_Gravity * m_GravityFactor)) : Vector3.zero);
+            m_MoveDirection += m_Motor + (m_UseGravity ? (m_GravityDirection * (m_Gravity * m_GravityFactor) * Time.fixedDeltaTime) : Vector3.zero);
 
-            // Ensure movement over any collision is smooth and correct any overlaps.
-            HandleHorizontalCollisions();
+            // Ensure movement over any collision is smooth and corrects any overlaps.
+            // HandleHorizontalCollisions();
             HandleVerticalCollisions();
 
             // Move character after all calculations are completed.
             // Make sure move direction is multiplied by delta time as the direction vector is too large for per-frame movement.
-            m_Rigidbody.MovePosition(m_Rigidbody.position + (m_MoveDirection * Time.fixedDeltaTime));
+            m_Rigidbody.MovePosition(m_Rigidbody.position + m_MoveDirection);
             m_MoveDirection = Vector3.zero;
         }
 
         private void HandleHorizontalCollisions()
         {
-            // TODO: Implement...
-        }
+            Vector3 localMoveDirection = transform.InverseTransformDirection(m_MoveDirection);
+            Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MoveDirection, transform.up);
 
-        private Vector3 CheckHorizontalCollisions(Vector3 moveDirection)
-        {
-            Vector3 direction = Vector3.zero;
-
-            Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(moveDirection, transform.up);
-            // Debug.Log(horizontalMoveDirection);
-            int amountHit = NonAllocCapsuleCast(
+            m_Collider.radius += COLLIDER_OFFSET;
+            int hitCount = NonAllocCapsuleCast(
                 m_Collider,
                 m_Collider.transform.position,
                 m_Collider.transform.rotation,
@@ -193,21 +192,16 @@ namespace ExtensibleCharacterController.Characters
                 horizontalMoveDirection,
                 ref m_RaycastHits
             );
-            Debug.DrawRay(m_Collider.transform.position, horizontalMoveDirection, Color.magenta);
-            if (amountHit == 0)
+            m_Collider.radius -= COLLIDER_OFFSET;
+
+            if (hitCount > 0)
             {
-                return Vector3.zero;
+                for (int i = 0; i < hitCount; i++)
+                {
+                    RaycastHit hit = m_RaycastHits[i];
+                    Debug.DrawRay(transform.position, hit.point - transform.position, Color.red);
+                }
             }
-
-            for (byte i = 0; i < amountHit; i++)
-            {
-                RaycastHit hit = m_RaycastHits[i];
-
-                Debug.DrawRay(hit.point, hit.normal, Color.cyan);
-                Debug.DrawRay(m_Collider.transform.position, hit.point - m_Collider.transform.position, Color.red);
-            }
-
-            return direction;
         }
 
         private void HandleVerticalCollisions()
@@ -220,7 +214,7 @@ namespace ExtensibleCharacterController.Characters
         {
             Vector3 direction = Vector3.zero;
 
-            RaycastHit[] hits = PerformGroundCast(moveDirection * Time.fixedDeltaTime); // Multiply by delta time to find "next frame" direction.
+            RaycastHit[] hits = PerformGroundCast(moveDirection); // Multiply by delta time to find "next frame" direction.
             List<RaycastHit> validHits = new List<RaycastHit>();
             for (int i = 0; i < hits.Length; i++)
             {
@@ -356,19 +350,92 @@ namespace ExtensibleCharacterController.Characters
         {
             Color color = Gizmos.color;
 
-            DrawHorizontalCheck();
-            DrawGroundCheck();
+            // DrawHorizontalCheck();
+            // DrawGroundCheck();
 
             Gizmos.color = color;
         }
 
         private void DrawHorizontalCheck()
         {
-            Vector3 moveDirection = Vector3.zero;
+            Color tempColor = Gizmos.color;
+
+            Vector3 moveDirection = transform.TransformDirection(new Vector3(0.0f, 0.0f, 5.0f));
+            m_RaycastHits = new RaycastHit[m_MaxCollisions];
             m_Collider = m_Collider ? m_Collider : GetComponentInChildren<CapsuleCollider>();
             m_Collider.radius += COLLIDER_OFFSET;
 
-            // TODO: Draw stuff here...
+            Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(moveDirection, transform.up);
+            Gizmos.color = Color.magenta;
+            Gizmos.DrawRay(transform.position, horizontalMoveDirection);
+            Gizmos.color = tempColor;
+
+            int hitCount = NonAllocCapsuleCast(
+                m_Collider,
+                m_Collider.transform.position,
+                m_Collider.transform.rotation,
+                m_Collider.radius,
+                horizontalMoveDirection,
+                ref m_RaycastHits
+            );
+
+            if (hitCount > 0)
+            {
+                for (int i = 0; i < hitCount; i++)
+                {
+                    RaycastHit hit = m_RaycastHits[i];
+
+                    Vector3 localHitPoint = transform.InverseTransformPoint(hit.point);
+                    Vector3 closestPoint = m_Collider.ClosestPoint(hit.point);
+                    Gizmos.color = Color.red;
+                    Gizmos.DrawWireSphere(closestPoint, 0.1f);
+                    if (localHitPoint.y <= m_MaxStep)
+                    {
+                        Vector3 direction = horizontalMoveDirection;
+                        Vector3 origin = closestPoint;
+                        bool wasHit = Physics.Raycast(origin, direction, out RaycastHit stepHit, 1 >> hit.transform.gameObject.layer);
+                        if (wasHit)
+                        {
+                            Gizmos.DrawSphere(stepHit.point, 0.1f);
+                            Gizmos.color = Color.cyan;
+                            Gizmos.DrawRay(stepHit.point, stepHit.normal);
+                            float slope = Vector3.Angle(transform.up, stepHit.normal);
+                            Debug.Log("Slope: " + slope);
+                        }
+
+                        // Vector3 direction = horizontalMoveDirection.normalized;
+                        // Vector3 origin = hit.point - (direction * (COLLIDER_OFFSET + 0.1f));
+                        // bool wasHit = Physics.Raycast(origin, direction, out RaycastHit stepHit, COLLIDER_OFFSET + 0.11f, 1 >> hit.transform.gameObject.layer);
+                        // if (wasHit)
+                        // {
+                        //     Gizmos.DrawSphere(origin, 0.1f);
+                        //     Gizmos.DrawRay(stepHit.point, stepHit.normal);
+                        //     float slope = Vector3.Angle(transform.up, stepHit.normal);
+                        //     // Debug.Log(i);
+                        //     Debug.Log("Slope:" + slope);
+                        // }
+                    }
+                    Gizmos.color = tempColor;
+
+                    // // Draw hit normal.
+                    // Gizmos.color = Color.cyan;
+                    // Gizmos.DrawRay(hit.point, hit.normal);
+                    // Gizmos.color = tempColor;
+
+                    // // Draw ray to point.
+                    // Gizmos.color = Color.red;
+                    // Gizmos.DrawRay(closestPoint, hit.point - closestPoint);
+
+                    // // Draw hit point.
+                    // Gizmos.color = Color.cyan;
+                    // Gizmos.DrawSphere(hit.point, 0.1f);
+
+                    // // Draw closest point.
+                    // Gizmos.DrawWireSphere(closestPoint, 0.1f);
+
+                    Gizmos.color = tempColor;
+                }
+            }
 
             m_Collider.radius -= COLLIDER_OFFSET;
         }
