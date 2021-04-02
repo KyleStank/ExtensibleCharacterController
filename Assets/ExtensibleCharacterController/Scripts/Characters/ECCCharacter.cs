@@ -168,9 +168,12 @@ namespace ExtensibleCharacterController.Characters
             // Apply forces.
             m_MoveDirection += m_Motor + (m_UseGravity ? (m_GravityDirection * (m_Gravity * m_GravityFactor) * Time.fixedDeltaTime) : Vector3.zero);
 
-            // Ensure movement over any collision is smooth and corrects any overlaps.
-            // HandleHorizontalCollisions();
-            HandleVerticalCollisions();
+            // Smooth out the move direction to allow the character to easily walk on any surface.
+            SmoothMoveDirection();
+
+            // Detect collisions and make adjustments to character position if needed.
+            DetectHorizontalCollisions();
+            DetectVerticalCollisions();
 
             // Move character after all calculations are completed.
             // Make sure move direction is multiplied by delta time as the direction vector is too large for per-frame movement.
@@ -178,7 +181,14 @@ namespace ExtensibleCharacterController.Characters
             m_MoveDirection = Vector3.zero;
         }
 
-        private void HandleHorizontalCollisions()
+        // TODO: https://app.asana.com/0/1200147678177766/1200147678177803
+        private void SmoothMoveDirection()
+        {
+
+        }
+
+        // TODO: https://app.asana.com/0/1200147678177766/1200147678177805
+        private void DetectHorizontalCollisions()
         {
             Vector3 localMoveDirection = transform.InverseTransformDirection(m_MoveDirection);
             Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MoveDirection, transform.up);
@@ -204,7 +214,8 @@ namespace ExtensibleCharacterController.Characters
             }
         }
 
-        private void HandleVerticalCollisions()
+        // TODO: https://app.asana.com/0/1200147678177766/1200147678177807
+        private void DetectVerticalCollisions()
         {
             Vector3 verticalMoveDirection = CreateGroundMoveDirection(m_MoveDirection);
             m_MoveDirection += verticalMoveDirection;
@@ -350,97 +361,24 @@ namespace ExtensibleCharacterController.Characters
         {
             Color color = Gizmos.color;
 
-            // DrawHorizontalCheck();
-            // DrawGroundCheck();
+            // DrawHorizontalChecks();
+            // DrawVerticalChecks();
 
             Gizmos.color = color;
         }
 
-        private void DrawHorizontalCheck()
+        private void DrawHorizontalChecks()
         {
-            Color tempColor = Gizmos.color;
+            // Color tempColor = Gizmos.color;
 
-            Vector3 moveDirection = transform.TransformDirection(new Vector3(0.0f, 0.0f, 5.0f));
-            m_RaycastHits = new RaycastHit[m_MaxCollisions];
-            m_Collider = m_Collider ? m_Collider : GetComponentInChildren<CapsuleCollider>();
-            m_Collider.radius += COLLIDER_OFFSET;
+            // Vector3 moveDirection = Vector3.zero;
+            // m_Collider = m_Collider ? m_Collider : GetComponentInChildren<CapsuleCollider>();
+            // m_Collider.radius += COLLIDER_OFFSET;
 
-            Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(moveDirection, transform.up);
-            Gizmos.color = Color.magenta;
-            Gizmos.DrawRay(transform.position, horizontalMoveDirection);
-            Gizmos.color = tempColor;
-
-            int hitCount = NonAllocCapsuleCast(
-                m_Collider,
-                m_Collider.transform.position,
-                m_Collider.transform.rotation,
-                m_Collider.radius,
-                horizontalMoveDirection,
-                ref m_RaycastHits
-            );
-
-            if (hitCount > 0)
-            {
-                for (int i = 0; i < hitCount; i++)
-                {
-                    RaycastHit hit = m_RaycastHits[i];
-
-                    Vector3 localHitPoint = transform.InverseTransformPoint(hit.point);
-                    Vector3 closestPoint = m_Collider.ClosestPoint(hit.point);
-                    Gizmos.color = Color.red;
-                    Gizmos.DrawWireSphere(closestPoint, 0.1f);
-                    if (localHitPoint.y <= m_MaxStep)
-                    {
-                        Vector3 direction = horizontalMoveDirection;
-                        Vector3 origin = closestPoint;
-                        bool wasHit = Physics.Raycast(origin, direction, out RaycastHit stepHit, 1 >> hit.transform.gameObject.layer);
-                        if (wasHit)
-                        {
-                            Gizmos.DrawSphere(stepHit.point, 0.1f);
-                            Gizmos.color = Color.cyan;
-                            Gizmos.DrawRay(stepHit.point, stepHit.normal);
-                            float slope = Vector3.Angle(transform.up, stepHit.normal);
-                            Debug.Log("Slope: " + slope);
-                        }
-
-                        // Vector3 direction = horizontalMoveDirection.normalized;
-                        // Vector3 origin = hit.point - (direction * (COLLIDER_OFFSET + 0.1f));
-                        // bool wasHit = Physics.Raycast(origin, direction, out RaycastHit stepHit, COLLIDER_OFFSET + 0.11f, 1 >> hit.transform.gameObject.layer);
-                        // if (wasHit)
-                        // {
-                        //     Gizmos.DrawSphere(origin, 0.1f);
-                        //     Gizmos.DrawRay(stepHit.point, stepHit.normal);
-                        //     float slope = Vector3.Angle(transform.up, stepHit.normal);
-                        //     // Debug.Log(i);
-                        //     Debug.Log("Slope:" + slope);
-                        // }
-                    }
-                    Gizmos.color = tempColor;
-
-                    // // Draw hit normal.
-                    // Gizmos.color = Color.cyan;
-                    // Gizmos.DrawRay(hit.point, hit.normal);
-                    // Gizmos.color = tempColor;
-
-                    // // Draw ray to point.
-                    // Gizmos.color = Color.red;
-                    // Gizmos.DrawRay(closestPoint, hit.point - closestPoint);
-
-                    // // Draw hit point.
-                    // Gizmos.color = Color.cyan;
-                    // Gizmos.DrawSphere(hit.point, 0.1f);
-
-                    // // Draw closest point.
-                    // Gizmos.DrawWireSphere(closestPoint, 0.1f);
-
-                    Gizmos.color = tempColor;
-                }
-            }
-
-            m_Collider.radius -= COLLIDER_OFFSET;
+            // m_Collider.radius -= COLLIDER_OFFSET;
         }
 
-        private void DrawGroundCheck()
+        private void DrawVerticalChecks()
         {
             Color tempColor = Gizmos.color;
 
