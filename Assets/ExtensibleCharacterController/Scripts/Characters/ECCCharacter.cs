@@ -1,11 +1,13 @@
+#if UNITY_EDITOR
+using UnityEditor;
+
+using ExtensibleCharacterController.Editor;
+#endif
+
 using System.Collections.Generic;
 using System.Reflection;
 
 using UnityEngine;
-
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
 
 using ExtensibleCharacterController.Core.Variables;
 using ExtensibleCharacterController.Core.Utility;
@@ -153,7 +155,6 @@ namespace ExtensibleCharacterController.Characters
         {
             // TODO: Input should not be handled in this class.
             m_Input = m_Controller != null ? m_Controller.GetInput() : Vector2.zero;
-
             Vector2 input = m_Input.normalized * Mathf.Max(Mathf.Abs(m_Input.x), Mathf.Abs(m_Input.y)) * Time.fixedDeltaTime;
             m_Motor = transform.TransformDirection(input.x, 0.0f, input.y);
         }
@@ -165,15 +166,18 @@ namespace ExtensibleCharacterController.Characters
             Vector3 eulerRot = m_Rigidbody.rotation.eulerAngles;
             eulerRot.y = Camera.main.transform.eulerAngles.y;
             m_Rigidbody.rotation = Quaternion.Euler(eulerRot);
+
+            // Set gravity direction every frame to account for rotation changes.
             m_GravityDirection = -transform.up;
 
-            // Apply forces.
+            // Apply motor and gravity forces.
+            m_GravityFactor = 0.0f;
             m_MoveDirection += m_Motor + (m_UseGravity ? (m_GravityDirection * (m_Gravity * m_GravityFactor) * Time.fixedDeltaTime) : Vector3.zero);
 
-            // Smooth out the move direction to allow the character to easily walk on any surface.
-            SmoothMoveDirection();
+            // Adjusts the move direction to smoothly move over any vertical or horizontal surface.
+            CreateSurfaceDirection();
 
-            // Detect collisions and make adjustments to character position if needed.
+            // Detect collisions and make adjustments to the move direction as needed.
             DetectHorizontalCollisions();
             DetectVerticalCollisions();
 
@@ -184,7 +188,7 @@ namespace ExtensibleCharacterController.Characters
         }
 
         // TODO: https://app.asana.com/0/1200147678177766/1200147678177803
-        private void SmoothMoveDirection()
+        private void CreateSurfaceDirection()
         {
 
         }
@@ -192,35 +196,37 @@ namespace ExtensibleCharacterController.Characters
         // TODO: https://app.asana.com/0/1200147678177766/1200147678177805
         private void DetectHorizontalCollisions()
         {
-            Vector3 localMoveDirection = transform.InverseTransformDirection(m_MoveDirection);
-            Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MoveDirection, transform.up);
+            // NOTE: Old "implementation". Nothing ever really happened here anyways.
+            // Vector3 localMoveDirection = transform.InverseTransformDirection(m_MoveDirection);
+            // Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MoveDirection, transform.up);
 
-            m_Collider.radius += COLLIDER_OFFSET;
-            int hitCount = NonAllocCapsuleCast(
-                m_Collider,
-                m_Collider.transform.position,
-                m_Collider.transform.rotation,
-                m_Collider.radius,
-                horizontalMoveDirection,
-                ref m_RaycastHits
-            );
-            m_Collider.radius -= COLLIDER_OFFSET;
+            // m_Collider.radius += COLLIDER_OFFSET;
+            // int hitCount = NonAllocCapsuleCast(
+            //     m_Collider,
+            //     m_Collider.transform.position,
+            //     m_Collider.transform.rotation,
+            //     m_Collider.radius,
+            //     horizontalMoveDirection,
+            //     ref m_RaycastHits
+            // );
+            // m_Collider.radius -= COLLIDER_OFFSET;
 
-            if (hitCount > 0)
-            {
-                for (int i = 0; i < hitCount; i++)
-                {
-                    RaycastHit hit = m_RaycastHits[i];
-                    Debug.DrawRay(transform.position, hit.point - transform.position, Color.red);
-                }
-            }
+            // if (hitCount > 0)
+            // {
+            //     for (int i = 0; i < hitCount; i++)
+            //     {
+            //         RaycastHit hit = m_RaycastHits[i];
+            //         Debug.DrawRay(transform.position, hit.point - transform.position, Color.red);
+            //     }
+            // }
         }
 
         // TODO: https://app.asana.com/0/1200147678177766/1200147678177807
         private void DetectVerticalCollisions()
         {
-            Vector3 verticalMoveDirection = CreateGroundMoveDirection(m_MoveDirection);
-            m_MoveDirection += verticalMoveDirection;
+            // NOTE: Old implementation.
+            // Vector3 verticalMoveDirection = CreateGroundMoveDirection(m_MoveDirection);
+            // m_MoveDirection += verticalMoveDirection;
         }
 
         private Vector3 CreateGroundMoveDirection(Vector3 moveDirection)
@@ -361,116 +367,11 @@ namespace ExtensibleCharacterController.Characters
         #if UNITY_EDITOR
         private void OnDrawGizmos()
         {
-            Color color = Gizmos.color;
+            Color originalGizmosColor = Gizmos.color;
 
-            // DrawHorizontalChecks();
-            // DrawVerticalChecks();
+            // Draw custom gizmos...
 
-            Gizmos.color = color;
-        }
-
-        private void DrawHorizontalChecks()
-        {
-            // Color tempColor = Gizmos.color;
-
-            // Vector3 moveDirection = Vector3.zero;
-            // m_Collider = m_Collider ? m_Collider : GetComponentInChildren<CapsuleCollider>();
-            // m_Collider.radius += COLLIDER_OFFSET;
-
-            // m_Collider.radius -= COLLIDER_OFFSET;
-        }
-
-        private void DrawVerticalChecks()
-        {
-            Color tempColor = Gizmos.color;
-
-            Vector3 moveDirection = m_MoveDirection;
-            m_Collider = m_Collider ? m_Collider : GetComponentInChildren<CapsuleCollider>();
-            m_Collider.radius += COLLIDER_OFFSET;
-
-            // Calculate half of the height, including scale and skin width.
-            float heightScale = ECCColliderHelper.GetCapsuleHeightScale(m_Collider);
-            float adjustedHalfHeight = (m_Collider.height / 2.0f) + m_SkinWidth;
-            float scaledHalfHeight = adjustedHalfHeight * heightScale;
-            Vector3 direction = ECCColliderHelper.GetCapsuleDirection(m_Collider);
-
-            // Calculate a capsule position that covers the TOP half of the CapsuleCollider.
-            // Since the adjusted half height is used as the full height, we need to half it one more time.
-            Vector3 topHalfCapsulePos = m_Collider.transform.position
-                + (direction * (scaledHalfHeight / 2.0f))
-                + (m_Collider.transform.InverseTransformDirection(moveDirection));
-            ECCColliderHelper.CalculateCapsuleCaps(
-                m_Collider,
-                topHalfCapsulePos,
-                m_Collider.transform.rotation,
-                out Vector3 topCapStart,
-                out Vector3 topCapEnd,
-                adjustedHalfHeight,
-                m_Collider.radius * m_GroundRadius
-            );
-
-            RaycastHit[] hits = Physics.CapsuleCastAll(
-                topCapStart,
-                topCapEnd,
-                m_Collider.radius * m_GroundRadius,
-                -direction,
-                scaledHalfHeight,
-                ~m_CharacterLayer.value
-            );
-            for (int i = 0; i < hits.Length; i++)
-            {
-                RaycastHit hit = hits[i];
-
-                Gizmos.color = Color.cyan;
-                Vector3 closestPoint = m_Collider.ClosestPoint(hit.point);
-                Gizmos.DrawSphere(hit.point, 0.1f);
-                Gizmos.DrawWireSphere(closestPoint, 0.1f);
-            }
-
-            // Draw bottom half.
-            DrawWireCapsule(
-                topHalfCapsulePos,
-                m_Collider.transform.rotation,
-                m_Collider.radius * m_GroundRadius,
-                scaledHalfHeight,
-                Color.green
-            );
-            DrawWireCapsule(
-                topHalfCapsulePos - (direction * (1.0f + m_SkinWidth)),
-                m_Collider.transform.rotation,
-                m_Collider.radius * m_GroundRadius,
-                scaledHalfHeight,
-                Color.green
-            );
-
-            m_Collider.radius -= COLLIDER_OFFSET;
-        }
-
-        private static void DrawWireCapsule(Vector3 _pos, Quaternion _rot, float _radius, float _height, Color _color = default(Color))
-        {
-            if (_color != default(Color))
-                Handles.color = _color;
-            Matrix4x4 angleMatrix = Matrix4x4.TRS(_pos, _rot, Handles.matrix.lossyScale);
-            using (new Handles.DrawingScope(angleMatrix))
-            {
-                var pointOffset = (_height - (_radius * 2)) / 2;
-
-                // Draw sideways.
-                Handles.DrawWireArc(Vector3.up * pointOffset, Vector3.left, Vector3.back, -180, _radius);
-                Handles.DrawLine(new Vector3(0, pointOffset, -_radius), new Vector3(0, -pointOffset, -_radius));
-                Handles.DrawLine(new Vector3(0, pointOffset, _radius), new Vector3(0, -pointOffset, _radius));
-                Handles.DrawWireArc(Vector3.down * pointOffset, Vector3.left, Vector3.back, 180, _radius);
-
-                // Draw frontways.
-                Handles.DrawWireArc(Vector3.up * pointOffset, Vector3.back, Vector3.left, 180, _radius);
-                Handles.DrawLine(new Vector3(-_radius, pointOffset, 0), new Vector3(-_radius, -pointOffset, 0));
-                Handles.DrawLine(new Vector3(_radius, pointOffset, 0), new Vector3(_radius, -pointOffset, 0));
-                Handles.DrawWireArc(Vector3.down * pointOffset, Vector3.back, Vector3.left, -180, _radius);
-
-                // Draw center.
-                Handles.DrawWireDisc(Vector3.up * pointOffset, Vector3.up, _radius);
-                Handles.DrawWireDisc(Vector3.down * pointOffset, Vector3.up, _radius);
-            }
+            Gizmos.color = originalGizmosColor;
         }
         #endif
     }
