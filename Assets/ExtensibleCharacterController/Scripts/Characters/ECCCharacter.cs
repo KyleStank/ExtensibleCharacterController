@@ -151,12 +151,14 @@ namespace ExtensibleCharacterController.Characters
 
         private void Update()
         {
+            // TODO: Input should not be handled in this class.
             m_Input = m_Controller != null ? m_Controller.GetInput() : Vector2.zero;
 
             Vector2 input = m_Input.normalized * Mathf.Max(Mathf.Abs(m_Input.x), Mathf.Abs(m_Input.y)) * Time.fixedDeltaTime;
             m_Motor = transform.TransformDirection(input.x, 0.0f, input.y);
         }
 
+        // TODO: https://app.asana.com/0/1200147678177766/1200147678177798
         private void FixedUpdate()
         {
             // TODO: Move elsewhere when ready.
