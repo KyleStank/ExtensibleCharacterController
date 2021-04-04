@@ -175,11 +175,16 @@ namespace ExtensibleCharacterController.Characters
             m_MoveDirection += m_Motor + (m_UseGravity ? (m_GravityDirection * (m_Gravity * m_GravityFactor) * Time.fixedDeltaTime) : Vector3.zero);
 
             // Adjusts the move direction to smoothly move over any vertical or horizontal surface.
-            CreateSurfaceDirection();
+            SmoothMoveDirection();
 
             // Detect collisions and make adjustments to the move direction as needed.
             DetectHorizontalCollisions();
             DetectVerticalCollisions();
+
+            #if UNITY_EDITOR
+            // Draw final movement direction.
+            Debug.DrawRay(transform.position, m_MoveDirection.normalized, Color.magenta);
+            #endif
 
             // Move character after all calculations are completed.
             // Make sure move direction is multiplied by delta time as the direction vector is too large for per-frame movement.
@@ -188,9 +193,87 @@ namespace ExtensibleCharacterController.Characters
         }
 
         // TODO: https://app.asana.com/0/1200147678177766/1200147678177803
-        private void CreateSurfaceDirection()
+        private void SmoothMoveDirection()
         {
+            // Get the horizontal move direction while ignoring the rotation of the character.
+            Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MoveDirection, -m_GravityDirection);
 
+            #if UNITY_EDITOR
+            // Draw horizontal direction.
+            Debug.DrawRay(transform.position, horizontalMoveDirection.normalized, Color.green);
+            #endif
+
+            // If not moving, nothing needs done.
+            if (horizontalMoveDirection.magnitude <= 0.001f) return;
+
+            // Cast in downward position.
+            int hitCount = NonAllocCapsuleCast(
+                m_Collider,
+                m_Collider.transform.position + horizontalMoveDirection,
+                m_Collider.transform.rotation,
+                m_Collider.radius + COLLIDER_OFFSET,
+                m_GravityDirection * m_SkinWidth,
+                ref m_RaycastHits
+            );
+
+            #if UNITY_EDITOR
+            // Draw bottom of capsule cast ray.
+            Debug.DrawRay(
+                (m_Collider.transform.position + horizontalMoveDirection) + (m_GravityDirection * (m_Collider.height / 2.0f)),
+                m_GravityDirection * m_SkinWidth,
+                hitCount > 0 ? Color.red : Color.green
+            );
+            #endif
+
+            if (hitCount > 0)
+            {
+                RaycastHit hit = GetClosestRaycastHitRecursive(hitCount, m_RaycastHits);
+
+                // To obtain the real normal, cast a tiny Raycast in the opposite direction of the normal from the hit point.
+                Vector3 hitPoint = hit.point + (hit.normal * COLLIDER_OFFSET);
+                bool wasHit = Physics.Raycast(
+                    hitPoint,
+                    -transform.up * (hit.distance + COLLIDER_OFFSET),
+                    out RaycastHit normalHit,
+                    ~m_CharacterLayer.value
+                );
+                if (wasHit)
+                {
+                    m_MoveDirection += CreateSlopeDirection(horizontalMoveDirection, hit.normal);
+                }
+            }
+        }
+
+        // Creates a direction based a sloped surface. If no slope is detected, returns provided direction.
+        // Only works for ground surfaces.
+        private Vector3 CreateSlopeDirection(Vector3 horizontalMoveDirection, Vector3 hitNormal)
+        {
+            // Calculate slope. If it's greater than the maximum slope allowed, than do nothing else.
+            float angle = Vector3.Angle(hitNormal, transform.up);
+            if (angle > m_MaxSlopeAngle) return Vector3.zero;
+
+            // Creates an up direction normal based on the hit normal and the right direction.
+            // Using the right direction affects the upNormal by rotation, which is useful for the forward direction below.
+            Vector3 upNormal = Vector3.ProjectOnPlane(hitNormal, transform.right).normalized;
+
+            #if UNITY_EDITOR
+            // Draw up normal.
+            Debug.DrawRay(transform.position, upNormal, Color.cyan);
+            #endif
+
+            // Invert because the default value is a backwards direction.
+            // Direction is created by crossing an up direction (hitNormal) and a right direction to get a forward direction.
+            Vector3 forwardDirection = -Vector3.Cross(
+                hitNormal,
+                Vector3.Cross(upNormal, horizontalMoveDirection) // Creates a right direction based on rotation and horizontal move direction.
+            ).normalized * horizontalMoveDirection.magnitude; // Normalize and multiply by magnitude to prevent character going up slopes slowly.
+
+            #if UNITY_EDITOR
+            // Draw forward direction.
+            Debug.DrawRay(transform.position, forwardDirection.normalized, Color.white);
+            #endif
+
+            return forwardDirection - horizontalMoveDirection;
         }
 
         // TODO: https://app.asana.com/0/1200147678177766/1200147678177805
@@ -224,74 +307,69 @@ namespace ExtensibleCharacterController.Characters
         // TODO: https://app.asana.com/0/1200147678177766/1200147678177807
         private void DetectVerticalCollisions()
         {
-            // NOTE: Old implementation.
-            // Vector3 verticalMoveDirection = CreateGroundMoveDirection(m_MoveDirection);
-            // m_MoveDirection += verticalMoveDirection;
-        }
+            float originalMoveDistance = m_MoveDirection.magnitude;
 
-        private Vector3 CreateGroundMoveDirection(Vector3 moveDirection)
-        {
-            Vector3 direction = Vector3.zero;
+            // Get the horizontal move direction while ignoring the rotation of the character.
+            Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MoveDirection, -m_GravityDirection);
 
-            RaycastHit[] hits = PerformGroundCast(moveDirection); // Multiply by delta time to find "next frame" direction.
-            List<RaycastHit> validHits = new List<RaycastHit>();
-            for (int i = 0; i < hits.Length; i++)
+            // Cast in downward position.
+            int hitCount = NonAllocCapsuleCast(
+                m_Collider,
+                m_Collider.transform.position + horizontalMoveDirection,
+                m_Collider.transform.rotation,
+                m_Collider.radius + COLLIDER_OFFSET,
+                m_GravityDirection * m_SkinWidth,
+                ref m_RaycastHits
+            );
+
+            if (hitCount > 0)
             {
-                // If collider has any overlaps, find the direction to seperate the overlap and move the character accordingly.
-                bool overlapped = IsOverlapped(hits[i].collider, Vector3.zero, out Vector3 dir, out float distance);
-                direction += (dir * distance * m_CollisionCorrectionSpeed);
+                RaycastHit hit = GetClosestRaycastHitRecursive(hitCount, m_RaycastHits);
 
-                // Calculate slope. If it's greater than the maximum slope allowed, than we are not grounded.
-                float angle = Vector3.Angle(hits[i].normal, m_Collider.transform.up);
-                if (angle > m_MaxSlopeAngle) continue;
+                Vector3 hitPoint = hit.point + (hit.normal * COLLIDER_OFFSET);
+                Vector3 closestPoint = m_Collider.ClosestPoint(hitPoint);
 
-                validHits.Add(hits[i]);
-            }
-
-            if (validHits.Count > 0)
-            {
-                m_IsGrounded = true;
-                m_GravityFactor = 0.0f;
-
-                RaycastHit closestHit = validHits[0];
-                for (int i = 0; i < validHits.Count; ++i)
+                // Get Y difference of closest collider point and raycast hit, then apply a small extra offset.
+                float offset = (hitPoint - closestPoint).y + 0.05f;
+                if (Mathf.Abs(offset) <= 0.001f) // Account for floating point error.
                 {
-                    if (hits[i].distance < closestHit.distance)
-                    {
-                        closestHit = hits[i];
-                    }
+                    offset = 0.0f;
                 }
 
-                /**
-                  * TODO: Fix character "jumping" over top of slope.
-                  * Since m_SkinWidth is not used here, sometimes the CapsuleCast will miss a collider and gravity will turn back on.
-                  * This will make the character "jump" over the top of a slope.
-                  * Only a concern for slopes with high angles.
-                  */
-                // Get the normal of the hit that will rotate with the character. Used to create a direction that is up or down any angle.
-                Vector3 hitNormal = Vector3.ProjectOnPlane(closestHit.normal, transform.right).normalized;
-
-                // Create a target direction that gets the orthogonal direction from the hitNormal and horizontalMoveDirection,
-                // and then gets another orthogonal direction that is placed on the surface in the correct orientation.
-                Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(moveDirection + direction, -m_GravityDirection);
-                Vector3 targetDirection = -Vector3.Cross( // Make negative because this returns a backwards direction.
-                    closestHit.normal,
-                    Vector3.Cross(hitNormal, horizontalMoveDirection.normalized).normalized
-                ).normalized;
-
-                // Exclude horizontal move direction to prevent wrong speed or directions.
-                direction += (targetDirection * horizontalMoveDirection.magnitude) - horizontalMoveDirection;
+                // Adjust move direction and if vertical offset is too low, use negative hit distance to prevent ground clipping.
+                m_MoveDirection.y += offset;
+                if (m_MoveDirection.y < -hit.distance) {
+                    m_MoveDirection.y = -hit.distance + 0.05f;
+                }
             }
-            else
+
+            // Fix any collision overlaps.
+            hitCount = NonAllocCapsuleCast(
+                m_Collider,
+                m_Collider.transform.position + horizontalMoveDirection,
+                m_Collider.transform.rotation,
+                m_Collider.radius + COLLIDER_OFFSET,
+                m_GravityDirection * m_SkinWidth,
+                ref m_RaycastHits
+            );
+
+            if (hitCount > 0)
             {
-                m_IsGrounded = false;
-                m_GravityFactor = 1.0f;
+                RaycastHit hit = GetClosestRaycastHitRecursive(hitCount, m_RaycastHits);
+
+                bool overlapped = CorrectOverlap(hit.collider, m_MoveDirection, out Vector3 direction, out float distance);
+                if (overlapped)
+                {
+                    // Only correct Y position.
+                    m_MoveDirection.y += direction.normalized.y * direction.magnitude * distance;
+                }
             }
 
-            return direction;
+            // Multiply by original move direction magnitude to prevent character from moving up surfaces too quickly.
+            m_MoveDirection = m_MoveDirection.normalized * originalMoveDistance;
         }
 
-        private bool IsOverlapped(Collider collider, Vector3 offset, out Vector3 direction, out float distance)
+        private bool CorrectOverlap(Collider collider, Vector3 offset, out Vector3 direction, out float distance)
         {
             Vector3 dir = Vector3.zero;
 
@@ -302,46 +380,6 @@ namespace ExtensibleCharacterController.Characters
             );
 
             return overlapped;
-        }
-
-        private RaycastHit[] PerformGroundCast(Vector3 moveDirection)
-        {
-            m_Collider.radius += COLLIDER_OFFSET;
-
-            // Get direction of capsule and calculate half of the height, including scale and skin width.
-            float heightScale = ECCColliderHelper.GetCapsuleHeightScale(m_Collider);
-            float adjustedHalfHeight = (m_Collider.height / 2.0f) + m_SkinWidth;
-            float scaledHalfHeight = adjustedHalfHeight * heightScale;
-            Vector3 direction = ECCColliderHelper.GetCapsuleDirection(m_Collider);
-
-            // Calculate a capsule position that covers the TOP half of the CapsuleCollider.
-            // Since the adjusted half height is used as the full height, we need to half it one more time.
-            Vector3 topHalfCapsulePos = m_Collider.transform.position
-                + (direction * (scaledHalfHeight / 2.0f))
-                + (m_Collider.transform.InverseTransformDirection(moveDirection));
-            ECCColliderHelper.CalculateCapsuleCaps(
-                m_Collider,
-                topHalfCapsulePos,
-                m_Collider.transform.rotation,
-                out Vector3 topCapStart,
-                out Vector3 topCapEnd,
-                adjustedHalfHeight,
-                (m_Collider.radius + COLLIDER_OFFSET) * m_GroundRadius
-            );
-
-            // Shoot the CapsuleCast in the inverse direction of the capsule from the top half position.
-            RaycastHit[] hits = Physics.CapsuleCastAll(
-                topCapStart,
-                topCapEnd,
-                (m_Collider.radius + COLLIDER_OFFSET) * m_GroundRadius,
-                -direction,
-                scaledHalfHeight,
-                ~m_CharacterLayer.value
-            );
-
-            m_Collider.radius -= COLLIDER_OFFSET;
-
-            return hits;
         }
 
         private int NonAllocCapsuleCast(
@@ -364,6 +402,26 @@ namespace ExtensibleCharacterController.Characters
             return Physics.CapsuleCastNonAlloc(capStart, capEnd, radius, direction.normalized, hits, direction.magnitude, ~m_CharacterLayer.value);
         }
 
+        // TODO: Placeholder for now. Eventually expand this method to require the index field and grab the closest point based on that.
+        private RaycastHit GetClosestRaycastHitRecursive(int hitCount, RaycastHit[] hits, int index = 0, RaycastHit closestHit = default(RaycastHit))
+        {
+            // Get next index, current hit, and the next hit.
+            int nextIndex = index + 1;
+            RaycastHit currentHit = hits[index];
+            RaycastHit nextHit = nextIndex < hitCount ? hits[nextIndex] : currentHit;
+
+            // Set closest hit to current hit if it hasn't been assigned anything.
+            closestHit = closestHit.Equals(default(RaycastHit)) ? currentHit : closestHit;
+
+            // If the next hit is closer, then it is the new closest hit.
+            if (nextHit.distance + COLLIDER_OFFSET < closestHit.distance + COLLIDER_OFFSET)
+            {
+                closestHit = nextHit;
+            }
+
+            return nextIndex < hitCount ? GetClosestRaycastHitRecursive(hitCount, hits, nextIndex, closestHit) : closestHit;
+        }
+
         #if UNITY_EDITOR
         private void OnDrawGizmos()
         {
@@ -376,28 +434,3 @@ namespace ExtensibleCharacterController.Characters
         #endif
     }
 }
-
-// TODO: Old reference code that may be useful.
-// *************************************************************************
-// * Creates a horizontal target direction from a hit surface.             *
-// * The direction is oriented from the surface normal, not the character. *
-// * If used, make sure to account for that oritentation difference.       *
-// *************************************************************************
-// Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MovementDirection, transform.up); // Convert move direction to horizontal.
-// Vector3 orthoHitNormal = Vector3.ProjectOnPlane(closestHit.normal, transform.up).normalized; // Return an orthogonal version of hit.normal.
-// Vector3 targetDirection = Vector3.Cross(orthoHitNormal, transform.up).normalized; // Return a orthogonal Vector based on the orthHitNormal and transform.up.
-
-// Vector3 slopeDirection = Vector3.Cross(orthoHitNormal, horizontalMoveDirection).normalized;
-// bool movingDown = Vector3.Dot(slopeDirection, transform.up) > 0.0f;
-// if (movingDown)
-// {
-//     targetDirection = -targetDirection;
-// }
-
-// Debug.DrawRay(transform.position, horizontalMoveDirection.normalized, Color.cyan);
-
-// // Draw hit normals.
-// Debug.DrawRay(closestHit.point, transform.up, Color.magenta); // Right direction "normal"
-// Debug.DrawRay(closestHit.point, orthoHitNormal, Color.green); // Orthogonal normal of regular hit.normal
-// Debug.DrawRay(closestHit.point, closestHit.normal, Color.green); // Regular hit.normal
-// Debug.DrawRay(transform.position, targetDirection, Color.magenta); // Target direction based on normals

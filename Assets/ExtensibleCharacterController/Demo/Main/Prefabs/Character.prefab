@@ -250,7 +250,7 @@ MonoBehaviour:
     m_Variable: {fileID: 0}
   m_MaxCollisions:
     m_UseConstantValue: 1
-    m_ConstantValue: 2
+    m_ConstantValue: 10
     m_Variable: {fileID: 0}
   m_GroundRadius:
     m_UseConstantValue: 1
@@ -258,7 +258,7 @@ MonoBehaviour:
     m_Variable: {fileID: 0}
   m_SkinWidth:
     m_UseConstantValue: 1
-    m_ConstantValue: 0.2
+    m_ConstantValue: 0.3
     m_Variable: {fileID: 0}
   m_MaxStep:
     m_UseConstantValue: 1
