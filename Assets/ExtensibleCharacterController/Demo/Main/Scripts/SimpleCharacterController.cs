@@ -13,8 +13,8 @@ namespace ExtensibleCharacterController.Demo
 
         public Vector2 GetInput()
         {
-            m_Input.x = Input.GetAxis("Horizontal");
-            m_Input.y = Input.GetAxis("Vertical");
+            m_Input.x = Input.GetAxisRaw("Horizontal");
+            m_Input.y = Input.GetAxisRaw("Vertical");
             return m_Input * m_Speed;
         }
     }

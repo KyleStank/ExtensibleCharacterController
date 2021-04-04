@@ -209,7 +209,7 @@ namespace ExtensibleCharacterController.Characters
             // Cast in downward position.
             int hitCount = NonAllocCapsuleCast(
                 m_Collider,
-                m_Collider.transform.position + horizontalMoveDirection,
+                m_Collider.transform.position + (transform.up * COLLIDER_OFFSET),
                 m_Collider.transform.rotation,
                 m_Collider.radius + COLLIDER_OFFSET,
                 m_GravityDirection * m_SkinWidth,
@@ -219,7 +219,7 @@ namespace ExtensibleCharacterController.Characters
             #if UNITY_EDITOR
             // Draw bottom of capsule cast ray.
             Debug.DrawRay(
-                (m_Collider.transform.position + horizontalMoveDirection) + (m_GravityDirection * (m_Collider.height / 2.0f)),
+                (m_Collider.transform.position + (transform.up * COLLIDER_OFFSET)) + (m_GravityDirection * (m_Collider.height / 2.0f)),
                 m_GravityDirection * m_SkinWidth,
                 hitCount > 0 ? Color.red : Color.green
             );
@@ -266,7 +266,7 @@ namespace ExtensibleCharacterController.Characters
             Vector3 forwardDirection = -Vector3.Cross(
                 hitNormal,
                 Vector3.Cross(upNormal, horizontalMoveDirection) // Creates a right direction based on rotation and horizontal move direction.
-            ).normalized * horizontalMoveDirection.magnitude; // Normalize and multiply by magnitude to prevent character going up slopes slowly.
+            ).normalized * horizontalMoveDirection.magnitude;
 
             #if UNITY_EDITOR
             // Draw forward direction.
@@ -315,7 +315,7 @@ namespace ExtensibleCharacterController.Characters
             // Cast in downward position.
             int hitCount = NonAllocCapsuleCast(
                 m_Collider,
-                m_Collider.transform.position + horizontalMoveDirection,
+                m_Collider.transform.position + (transform.up * COLLIDER_OFFSET),
                 m_Collider.transform.rotation,
                 m_Collider.radius + COLLIDER_OFFSET,
                 m_GravityDirection * m_SkinWidth,
@@ -330,7 +330,7 @@ namespace ExtensibleCharacterController.Characters
                 Vector3 closestPoint = m_Collider.ClosestPoint(hitPoint);
 
                 // Get Y difference of closest collider point and raycast hit, then apply a small extra offset.
-                float offset = (hitPoint - closestPoint).y + 0.05f;
+                float offset = (hitPoint - closestPoint).y;
                 if (Mathf.Abs(offset) <= 0.001f) // Account for floating point error.
                 {
                     offset = 0.0f;
@@ -338,15 +338,16 @@ namespace ExtensibleCharacterController.Characters
 
                 // Adjust move direction and if vertical offset is too low, use negative hit distance to prevent ground clipping.
                 m_MoveDirection.y += offset;
-                if (m_MoveDirection.y < -hit.distance) {
-                    m_MoveDirection.y = -hit.distance + 0.05f;
+                if (m_MoveDirection.y < -hit.distance)
+                {
+                    m_MoveDirection.y = -hit.distance;
                 }
             }
 
             // Fix any collision overlaps.
             hitCount = NonAllocCapsuleCast(
                 m_Collider,
-                m_Collider.transform.position + horizontalMoveDirection,
+                m_Collider.transform.position + (transform.up * COLLIDER_OFFSET),
                 m_Collider.transform.rotation,
                 m_Collider.radius + COLLIDER_OFFSET,
                 m_GravityDirection * m_SkinWidth,
@@ -357,11 +358,15 @@ namespace ExtensibleCharacterController.Characters
             {
                 RaycastHit hit = GetClosestRaycastHitRecursive(hitCount, m_RaycastHits);
 
-                bool overlapped = CorrectOverlap(hit.collider, m_MoveDirection, out Vector3 direction, out float distance);
+                // Calculate slope. If it's greater than the maximum slope allowed, than do nothing else.
+                float angle = Vector3.Angle(hit.normal, transform.up);
+                if (angle > m_MaxSlopeAngle) return;
+
+                bool overlapped = CorrectOverlap(hit.collider, m_MoveDirection, out Vector3 offset, out float distance);
                 if (overlapped)
                 {
-                    // Only correct Y position.
-                    m_MoveDirection.y += direction.normalized.y * direction.magnitude * distance;
+                    m_MoveDirection += offset.normalized * (distance + COLLIDER_OFFSET);
+                    // m_MoveDirection.y += offset.normalized.y * (distance + COLLIDER_OFFSET);
                 }
             }
 
