@@ -58,6 +58,7 @@ namespace ExtensibleCharacterController.Characters
 
         private CapsuleCollider m_Collider = null;
         private RaycastHit[] m_RaycastHits;
+        private Collider[] m_OverlappedColliders;
 
         private Vector3 m_MoveDirection = Vector3.zero;
         private Vector3 m_GravityDirection = -Vector3.up;
@@ -70,6 +71,7 @@ namespace ExtensibleCharacterController.Characters
         protected override void Initialize()
         {
             m_RaycastHits = new RaycastHit[m_MaxCollisions];
+            m_OverlappedColliders = new Collider[m_MaxCollisions];
 
             // TODO: Create custom inspector that adds through dropdown rather than manual string type names.
             // TODO: Create custom inspector to drag and order the priority of each behaviour.
@@ -169,12 +171,12 @@ namespace ExtensibleCharacterController.Characters
             m_GravityFactor = 0.0f;
             m_MoveDirection += m_Motor + (m_UseGravity ? (m_GravityDirection * (m_Gravity * m_GravityFactor) * Time.fixedDeltaTime) : Vector3.zero);
 
-            // Adjusts the move direction to smoothly move over any vertical or horizontal surface.
-            SmoothMoveDirection();
+            // // Adjusts the move direction to smoothly move over any vertical or horizontal surface.
+            // SmoothMoveDirection();
 
             // Detect collisions and make adjustments to the move direction as needed.
             DetectHorizontalCollisions();
-            DetectVerticalCollisions();
+            // DetectVerticalCollisions();
 
             #if UNITY_EDITOR
             // Draw final movement direction.
@@ -249,74 +251,74 @@ namespace ExtensibleCharacterController.Characters
             return forwardDirection - horizontalMoveDirection;
         }
 
-        private bool IsWalkableNormal(Vector3 normal)
-        {
-            // Calculate angle of slope based on normal.
-            float angle = Vector3.Angle(normal, transform.up);
-            return angle < m_MaxSlopeAngle;
-        }
-
         // TODO: https://app.asana.com/0/1200147678177766/1200147678177805
         private void DetectHorizontalCollisions()
         {
             Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MoveDirection, transform.up);
+            Vector3 targetDirection = Vector3.zero;
+            Vector3 combinedDirection = horizontalMoveDirection + targetDirection;
 
-            // Cast in horizontal move direction.
+            // Fix overlaps before continuing.
+            int overlapCount = NonAllocCapsuleOverlap(
+                horizontalMoveDirection,
+                ref m_OverlappedColliders
+            );
+            for (int i = 0; i < overlapCount; i++)
+            {
+                if (IsOverlapping(
+                    m_OverlappedColliders[i],
+                    combinedDirection,
+                    out Vector3 direction,
+                    out float distance
+                ))
+                {
+                    Vector3 offset = Vector3.ProjectOnPlane(direction, transform.up);
+                    targetDirection += (offset - combinedDirection) - offset;
+                }
+
+                combinedDirection = horizontalMoveDirection + targetDirection;
+            }
+
+            // Do one last overlap check.
+            overlapCount = NonAllocCapsuleOverlap(
+                combinedDirection,
+                ref m_OverlappedColliders
+            );
+            for (int i = 0; i < overlapCount; i++)
+            {
+                if (IsOverlapping(
+                    m_OverlappedColliders[i],
+                    combinedDirection,
+                    out Vector3 direction,
+                    out float distance
+                ))
+                {
+                    targetDirection += direction;
+                }
+
+                combinedDirection = horizontalMoveDirection + targetDirection;
+            }
+
+            // Perform cast in horizontal direction plus corrected overlap direction.
             int hitCount = NonAllocCapsuleCast(
-                transform.up * COLLIDER_OFFSET,
-                horizontalMoveDirection,
+                combinedDirection,
+                combinedDirection,
                 ref m_RaycastHits
             );
-
             if (hitCount > 0)
             {
                 RaycastHit closestRaycastHit = GetClosestRaycastHitRecursive(hitCount, m_RaycastHits);
 
-                // Check for overlap.
-                bool overlapped = CorrectOverlap(m_Collider, horizontalMoveDirection, out Vector3 direction, out float distance);
-                if (overlapped)
-                {
-                    float mag = m_MoveDirection.magnitude;
-                    m_MoveDirection += Vector3.ProjectOnPlane(direction.normalized * (distance + COLLIDER_OFFSET), transform.up);
-                    m_MoveDirection = m_MoveDirection.normalized * mag;
-                }
+                // Create direction to slide against surfaces.
+                Vector3 horizontalNormal = Vector3.ProjectOnPlane(closestRaycastHit.normal, transform.up);
+                Vector3 wallSlideDirection = Vector3.ProjectOnPlane(horizontalMoveDirection, horizontalNormal);
+                targetDirection += (wallSlideDirection - (closestRaycastHit.distance > 0.0f ? horizontalMoveDirection : Vector3.zero));
             }
 
             ClearRaycasts();
 
-            // Re-calculate horizontal direction to account for overlap correction.
-            horizontalMoveDirection = Vector3.ProjectOnPlane(m_MoveDirection, transform.up);
-            hitCount = NonAllocCapsuleCast(
-                transform.up * COLLIDER_OFFSET,
-                horizontalMoveDirection,
-                ref m_RaycastHits
-            );
-
-            if (hitCount > 0)
-            {
-                RaycastHit closestRaycastHit = GetClosestRaycastHitRecursive(hitCount, m_RaycastHits);
-
-                // Use a regular raycast to find the regular normal as CapsuleCast normals are not always the true normal.
-                bool walkableNormal = false;
-                Vector3 closestPoint = m_Collider.ClosestPoint(closestRaycastHit.point);
-                closestPoint = m_Collider.transform.TransformPoint(closestPoint);
-                Vector3 origin = closestRaycastHit.distance > 0 ?
-                    closestPoint :
-                    m_Collider.transform.position + (transform.up * COLLIDER_OFFSET);
-                if (Physics.Raycast(origin, horizontalMoveDirection, out RaycastHit hit, ~m_CharacterLayer.value))
-                {
-                    walkableNormal = IsWalkableNormal(hit.normal);
-                }
-
-                // If the surface is not walkable, slide against it.
-                if (!walkableNormal)
-                {
-                    Vector3 wallSlideDirection = Vector3.ProjectOnPlane(horizontalMoveDirection, closestRaycastHit.normal);
-                    m_MoveDirection += (wallSlideDirection - horizontalMoveDirection);
-                }
-            }
-
-            ClearRaycasts();
+            combinedDirection = horizontalMoveDirection + targetDirection;
+            m_MoveDirection = combinedDirection + (m_MoveDirection - horizontalMoveDirection);
         }
 
         // TODO: https://app.asana.com/0/1200147678177766/1200147678177807
@@ -371,7 +373,7 @@ namespace ExtensibleCharacterController.Characters
 
                 if (!IsWalkableNormal(hit.normal)) return;
 
-                bool overlapped = CorrectOverlap(hit.collider, m_MoveDirection, out Vector3 offset, out float distance);
+                bool overlapped = IsOverlapping(hit.collider, m_MoveDirection, out Vector3 offset, out float distance);
                 if (overlapped)
                 {
                     m_MoveDirection += offset.normalized * (distance + COLLIDER_OFFSET);
@@ -385,24 +387,38 @@ namespace ExtensibleCharacterController.Characters
             ClearRaycasts();
         }
 
-        private bool CorrectOverlap(Collider collider, Vector3 offset, out Vector3 direction, out float distance)
+        private bool IsWalkableNormal(Vector3 normal)
         {
-            Vector3 dir = Vector3.zero;
+            // Calculate angle of slope based on normal.
+            float angle = Vector3.Angle(normal, transform.up);
+            return angle < m_MaxSlopeAngle;
+        }
 
+        private bool IsOverlapping(Collider collider, Vector3 offset, out Vector3 direction, out float distance)
+        {
+            float capsuleRadius = m_Collider.radius;
+            float radiusMultiplier = ECCColliderHelper.GetCapsuleRadiusScale(m_Collider);
+            float overlapRadius = (capsuleRadius * radiusMultiplier) + COLLIDER_OFFSET;
+
+            // Set radius of capsule to account for scale and small offset.
+            m_Collider.radius = overlapRadius;
             bool overlapped = Physics.ComputePenetration(
                 m_Collider, m_Collider.transform.position + offset, m_Collider.transform.rotation,
                 collider, collider.transform.position, collider.transform.rotation,
                 out direction, out distance
             );
+            if (overlapped)
+            {
+                direction = direction.normalized * (distance + COLLIDER_OFFSET);
+            }
+
+            // Reset radius.
+            m_Collider.radius = capsuleRadius;
 
             return overlapped;
         }
 
-        private int NonAllocCapsuleCast(
-            Vector3 offset,
-            Vector3 direction,
-            ref RaycastHit[] hits
-        )
+        private int NonAllocCapsuleCast(Vector3 offset, Vector3 direction, ref RaycastHit[] hits)
         {
             float radiusMultiplier = ECCColliderHelper.GetCapsuleRadiusScale(m_Collider);
             float radius = (m_Collider.radius * radiusMultiplier) + COLLIDER_OFFSET;
@@ -415,6 +431,21 @@ namespace ExtensibleCharacterController.Characters
             );
 
             return Physics.CapsuleCastNonAlloc(capStart, capEnd, radius, direction.normalized, hits, direction.magnitude, ~m_CharacterLayer.value);
+        }
+
+        private int NonAllocCapsuleOverlap(Vector3 offset, ref Collider[] colliders)
+        {
+            float radiusMultiplier = ECCColliderHelper.GetCapsuleRadiusScale(m_Collider);
+            float radius = (m_Collider.radius * radiusMultiplier) + COLLIDER_OFFSET;
+            ECCColliderHelper.CalculateCapsuleCaps(
+                m_Collider,
+                m_Collider.transform.position + offset,
+                m_Collider.transform.rotation,
+                out Vector3 capStart,
+                out Vector3 capEnd
+            );
+
+            return Physics.OverlapCapsuleNonAlloc(capStart, capEnd, radius, colliders, ~m_CharacterLayer.value);
         }
 
         private void ClearRaycasts()

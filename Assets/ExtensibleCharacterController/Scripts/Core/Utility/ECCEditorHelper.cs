@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace ExtensibleCharacterController.Editor
 {
-    public static class ECCEditorUtility
+    public static class ECCEditorHelper
     {
         public static void DrawWireCapsule(Vector3 _pos, Quaternion _rot, float _radius, float _height, Color _color = default(Color))
         {
