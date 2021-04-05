@@ -29,15 +29,10 @@ namespace ExtensibleCharacterController.Characters
         private ECCFloatReference m_Gravity = -Physics.gravity.y;
 
         [Header("Collision Settings")]
-        [Tooltip("The speed at which the character's collider will seperate from an overlapped collider.")]
-        [SerializeField]
-        private ECCFloatReference m_CollisionCorrectionSpeed = 50.0f;
         [SerializeField]
         private ECCIntReference m_MaxCollisions = 10;
 
         [Header("Ground Settings")]
-        [SerializeField]
-        private ECCFloatReference m_GroundRadius = 1.0f;
         [SerializeField]
         private ECCFloatReference m_SkinWidth = 0.1f;
         [SerializeField]
@@ -208,10 +203,7 @@ namespace ExtensibleCharacterController.Characters
 
             // Cast in downward position.
             int hitCount = NonAllocCapsuleCast(
-                m_Collider,
-                m_Collider.transform.position + (transform.up * COLLIDER_OFFSET),
-                m_Collider.transform.rotation,
-                m_Collider.radius + COLLIDER_OFFSET,
+                transform.up * COLLIDER_OFFSET,
                 m_GravityDirection * m_SkinWidth,
                 ref m_RaycastHits
             );
@@ -314,10 +306,7 @@ namespace ExtensibleCharacterController.Characters
 
             // Cast in downward position.
             int hitCount = NonAllocCapsuleCast(
-                m_Collider,
-                m_Collider.transform.position + (transform.up * COLLIDER_OFFSET),
-                m_Collider.transform.rotation,
-                m_Collider.radius + COLLIDER_OFFSET,
+                transform.up * COLLIDER_OFFSET,
                 m_GravityDirection * m_SkinWidth,
                 ref m_RaycastHits
             );
@@ -346,10 +335,7 @@ namespace ExtensibleCharacterController.Characters
 
             // Fix any collision overlaps.
             hitCount = NonAllocCapsuleCast(
-                m_Collider,
-                m_Collider.transform.position + (transform.up * COLLIDER_OFFSET),
-                m_Collider.transform.rotation,
-                m_Collider.radius + COLLIDER_OFFSET,
+                transform.up * COLLIDER_OFFSET,
                 m_GravityDirection * m_SkinWidth,
                 ref m_RaycastHits
             );
@@ -388,18 +374,17 @@ namespace ExtensibleCharacterController.Characters
         }
 
         private int NonAllocCapsuleCast(
-            CapsuleCollider collider,
-            Vector3 position,
-            Quaternion rotation,
-            float radius,
+            Vector3 offset,
             Vector3 direction,
             ref RaycastHit[] hits
         )
         {
+            float radiusMultiplier = ECCColliderHelper.GetCapsuleRadiusScale(m_Collider);
+            float radius = (m_Collider.radius * radiusMultiplier) + COLLIDER_OFFSET;
             ECCColliderHelper.CalculateCapsuleCaps(
-                collider,
-                position,
-                rotation,
+                m_Collider,
+                m_Collider.transform.position + offset,
+                m_Collider.transform.rotation,
                 out Vector3 capStart,
                 out Vector3 capEnd
             );
