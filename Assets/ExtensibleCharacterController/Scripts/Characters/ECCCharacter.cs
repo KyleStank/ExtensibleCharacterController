@@ -190,16 +190,13 @@ namespace ExtensibleCharacterController.Characters
         // TODO: https://app.asana.com/0/1200147678177766/1200147678177803
         private void SmoothMoveDirection()
         {
-            // Get the horizontal move direction while ignoring the rotation of the character.
             Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MoveDirection, -m_GravityDirection);
+            if (!IsMovingHorizontal(horizontalMoveDirection)) return;
 
             #if UNITY_EDITOR
             // Draw horizontal direction.
             Debug.DrawRay(transform.position, horizontalMoveDirection.normalized, Color.green);
             #endif
-
-            // If not moving, nothing needs done.
-            if (horizontalMoveDirection.magnitude <= 0.001f) return;
 
             // Cast in downward position.
             int hitCount = NonAllocCapsuleCast(
@@ -221,28 +218,20 @@ namespace ExtensibleCharacterController.Characters
             {
                 RaycastHit hit = GetClosestRaycastHitRecursive(hitCount, m_RaycastHits);
 
-                // To obtain the real normal, cast a tiny Raycast in the opposite direction of the normal from the hit point.
-                Vector3 hitPoint = hit.point + (hit.normal * COLLIDER_OFFSET);
-                bool wasHit = Physics.Raycast(
-                    hitPoint,
-                    -transform.up * (hit.distance + COLLIDER_OFFSET),
-                    out RaycastHit normalHit,
-                    ~m_CharacterLayer.value
-                );
-                if (wasHit)
-                {
-                    m_MoveDirection += CreateSlopeDirection(horizontalMoveDirection, hit.normal);
-                }
+                m_MoveDirection += CreateSlopeDirection(horizontalMoveDirection, hit.normal);
             }
+        }
+
+        private bool IsMovingHorizontal(Vector3 horizontalMoveDirection)
+        {
+            return horizontalMoveDirection.magnitude >= 0.001f;
         }
 
         // Creates a direction based a sloped surface. If no slope is detected, returns provided direction.
         // Only works for ground surfaces.
         private Vector3 CreateSlopeDirection(Vector3 horizontalMoveDirection, Vector3 hitNormal)
         {
-            // Calculate slope. If it's greater than the maximum slope allowed, than do nothing else.
-            float angle = Vector3.Angle(hitNormal, transform.up);
-            if (angle > m_MaxSlopeAngle) return Vector3.zero;
+            if (!IsWalkableNormal(hitNormal)) return Vector3.zero;
 
             // Creates an up direction normal based on the hit normal and the right direction.
             // Using the right direction affects the upNormal by rotation, which is useful for the forward direction below.
@@ -258,10 +247,72 @@ namespace ExtensibleCharacterController.Characters
             return forwardDirection - horizontalMoveDirection;
         }
 
+        private bool IsWalkableNormal(Vector3 normal)
+        {
+            // Calculate angle of slope based on normal.
+            float angle = Vector3.Angle(normal, transform.up);
+            Debug.Log(angle);
+            return angle < m_MaxSlopeAngle;
+        }
+
         // TODO: https://app.asana.com/0/1200147678177766/1200147678177805
         private void DetectHorizontalCollisions()
         {
+            Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MoveDirection, transform.up);
 
+            // Cast in horizontal move direction.
+            int hitCount = NonAllocCapsuleCast(
+                transform.up * COLLIDER_OFFSET,
+                horizontalMoveDirection,
+                ref m_RaycastHits
+            );
+
+            if (hitCount > 0)
+            {
+                RaycastHit closestRaycastHit = GetClosestRaycastHitRecursive(hitCount, m_RaycastHits);
+
+                // Check for overlap.
+                bool overlapped = CorrectOverlap(m_Collider, horizontalMoveDirection, out Vector3 direction, out float distance);
+                if (overlapped)
+                {
+                    float mag = m_MoveDirection.magnitude;
+                    m_MoveDirection += direction.normalized * (distance + COLLIDER_OFFSET);
+                    m_MoveDirection = m_MoveDirection.normalized * mag;
+                }
+            }
+
+            // Re-calculate horizontal direction to account for overlap correction.
+            horizontalMoveDirection = Vector3.ProjectOnPlane(m_MoveDirection, transform.up);
+            hitCount = NonAllocCapsuleCast(
+                transform.up * COLLIDER_OFFSET,
+                horizontalMoveDirection,
+                ref m_RaycastHits
+            );
+
+            if (hitCount > 0)
+            {
+                RaycastHit closestRaycastHit = GetClosestRaycastHitRecursive(hitCount, m_RaycastHits);
+
+                // Use a regular raycast to find the regular normal as CapsuleCast normals are not always the true normal.
+                bool walkableNormal = false;
+                Vector3 closestPoint = m_Collider.ClosestPoint(closestRaycastHit.point);
+                closestPoint = m_Collider.transform.TransformPoint(closestPoint);
+                Vector3 origin = closestRaycastHit.distance > 0 ?
+                    closestPoint :
+                    m_Collider.transform.position + (transform.up * COLLIDER_OFFSET);
+                if (Physics.Raycast(origin, horizontalMoveDirection, out RaycastHit hit, ~m_CharacterLayer.value))
+                {
+                    walkableNormal = IsWalkableNormal(hit.normal);
+                }
+
+                // If the surface is not walkable, slide against it.
+                if (!walkableNormal)
+                {
+                    Vector3 wallSlideDirection = Vector3.ProjectOnPlane(horizontalMoveDirection, closestRaycastHit.normal);
+                    m_MoveDirection += -horizontalMoveDirection + wallSlideDirection;
+                    Debug.Log(m_MoveDirection);
+                }
+            }
         }
 
         // TODO: https://app.asana.com/0/1200147678177766/1200147678177807
@@ -312,9 +363,7 @@ namespace ExtensibleCharacterController.Characters
             {
                 RaycastHit hit = GetClosestRaycastHitRecursive(hitCount, m_RaycastHits);
 
-                // Calculate slope. If it's greater than the maximum slope allowed, than do nothing else.
-                float angle = Vector3.Angle(hit.normal, transform.up);
-                if (angle > m_MaxSlopeAngle) return;
+                if (!IsWalkableNormal(hit.normal)) return;
 
                 bool overlapped = CorrectOverlap(hit.collider, m_MoveDirection, out Vector3 offset, out float distance);
                 if (overlapped)
