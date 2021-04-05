@@ -220,6 +220,8 @@ namespace ExtensibleCharacterController.Characters
 
                 m_MoveDirection += CreateSlopeDirection(horizontalMoveDirection, hit.normal);
             }
+
+            ClearRaycasts();
         }
 
         private bool IsMovingHorizontal(Vector3 horizontalMoveDirection)
@@ -251,7 +253,6 @@ namespace ExtensibleCharacterController.Characters
         {
             // Calculate angle of slope based on normal.
             float angle = Vector3.Angle(normal, transform.up);
-            Debug.Log(angle);
             return angle < m_MaxSlopeAngle;
         }
 
@@ -276,10 +277,12 @@ namespace ExtensibleCharacterController.Characters
                 if (overlapped)
                 {
                     float mag = m_MoveDirection.magnitude;
-                    m_MoveDirection += direction.normalized * (distance + COLLIDER_OFFSET);
+                    m_MoveDirection += Vector3.ProjectOnPlane(direction.normalized * (distance + COLLIDER_OFFSET), transform.up);
                     m_MoveDirection = m_MoveDirection.normalized * mag;
                 }
             }
+
+            ClearRaycasts();
 
             // Re-calculate horizontal direction to account for overlap correction.
             horizontalMoveDirection = Vector3.ProjectOnPlane(m_MoveDirection, transform.up);
@@ -309,10 +312,11 @@ namespace ExtensibleCharacterController.Characters
                 if (!walkableNormal)
                 {
                     Vector3 wallSlideDirection = Vector3.ProjectOnPlane(horizontalMoveDirection, closestRaycastHit.normal);
-                    m_MoveDirection += -horizontalMoveDirection + wallSlideDirection;
-                    Debug.Log(m_MoveDirection);
+                    m_MoveDirection += (wallSlideDirection - horizontalMoveDirection);
                 }
             }
+
+            ClearRaycasts();
         }
 
         // TODO: https://app.asana.com/0/1200147678177766/1200147678177807
@@ -352,6 +356,8 @@ namespace ExtensibleCharacterController.Characters
                 }
             }
 
+            ClearRaycasts();
+
             // Fix any collision overlaps.
             hitCount = NonAllocCapsuleCast(
                 transform.up * COLLIDER_OFFSET,
@@ -375,6 +381,8 @@ namespace ExtensibleCharacterController.Characters
 
             // Multiply by original move direction magnitude to prevent character from moving up surfaces too quickly.
             m_MoveDirection = m_MoveDirection.normalized * originalMoveDistance;
+
+            ClearRaycasts();
         }
 
         private bool CorrectOverlap(Collider collider, Vector3 offset, out Vector3 direction, out float distance)
@@ -407,6 +415,14 @@ namespace ExtensibleCharacterController.Characters
             );
 
             return Physics.CapsuleCastNonAlloc(capStart, capEnd, radius, direction.normalized, hits, direction.magnitude, ~m_CharacterLayer.value);
+        }
+
+        private void ClearRaycasts()
+        {
+            for (int i = 0; i < m_RaycastHits.Length; i++)
+            {
+                m_RaycastHits[i] = default(RaycastHit);
+            }
         }
 
         // TODO: Placeholder for now. Eventually expand this method to require the index field and grab the closest point based on that.
