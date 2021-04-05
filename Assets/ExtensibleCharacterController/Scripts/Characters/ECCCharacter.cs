@@ -248,11 +248,6 @@ namespace ExtensibleCharacterController.Characters
             // Using the right direction affects the upNormal by rotation, which is useful for the forward direction below.
             Vector3 upNormal = Vector3.ProjectOnPlane(hitNormal, transform.right).normalized;
 
-            #if UNITY_EDITOR
-            // Draw up normal.
-            Debug.DrawRay(transform.position, upNormal, Color.cyan);
-            #endif
-
             // Invert because the default value is a backwards direction.
             // Direction is created by crossing an up direction (hitNormal) and a right direction to get a forward direction.
             Vector3 forwardDirection = -Vector3.Cross(
@@ -260,40 +255,13 @@ namespace ExtensibleCharacterController.Characters
                 Vector3.Cross(upNormal, horizontalMoveDirection) // Creates a right direction based on rotation and horizontal move direction.
             ).normalized * horizontalMoveDirection.magnitude;
 
-            #if UNITY_EDITOR
-            // Draw forward direction.
-            Debug.DrawRay(transform.position, forwardDirection.normalized, Color.white);
-            #endif
-
             return forwardDirection - horizontalMoveDirection;
         }
 
         // TODO: https://app.asana.com/0/1200147678177766/1200147678177805
         private void DetectHorizontalCollisions()
         {
-            // NOTE: Old "implementation". Nothing ever really happened here anyways.
-            // Vector3 localMoveDirection = transform.InverseTransformDirection(m_MoveDirection);
-            // Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MoveDirection, transform.up);
 
-            // m_Collider.radius += COLLIDER_OFFSET;
-            // int hitCount = NonAllocCapsuleCast(
-            //     m_Collider,
-            //     m_Collider.transform.position,
-            //     m_Collider.transform.rotation,
-            //     m_Collider.radius,
-            //     horizontalMoveDirection,
-            //     ref m_RaycastHits
-            // );
-            // m_Collider.radius -= COLLIDER_OFFSET;
-
-            // if (hitCount > 0)
-            // {
-            //     for (int i = 0; i < hitCount; i++)
-            //     {
-            //         RaycastHit hit = m_RaycastHits[i];
-            //         Debug.DrawRay(transform.position, hit.point - transform.position, Color.red);
-            //     }
-            // }
         }
 
         // TODO: https://app.asana.com/0/1200147678177766/1200147678177807
