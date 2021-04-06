@@ -254,71 +254,108 @@ namespace ExtensibleCharacterController.Characters
         // TODO: https://app.asana.com/0/1200147678177766/1200147678177805
         private void DetectHorizontalCollisions()
         {
+            float horizontalOffset = 0.05f;
             Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MoveDirection, transform.up);
             Vector3 targetDirection = Vector3.zero;
-            Vector3 combinedDirection = horizontalMoveDirection + targetDirection;
 
-            // Fix overlaps before continuing.
+            Vector3 offset = horizontalMoveDirection.normalized * horizontalOffset;
             int overlapCount = NonAllocCapsuleOverlap(
-                horizontalMoveDirection,
+                offset,
                 ref m_OverlappedColliders
             );
             for (int i = 0; i < overlapCount; i++)
             {
-                if (IsOverlapping(
+                bool overlapped = IsOverlapping(
                     m_OverlappedColliders[i],
-                    combinedDirection,
+                    targetDirection,
                     out Vector3 direction,
                     out float distance
-                ))
-                {
-                    Vector3 offset = Vector3.ProjectOnPlane(direction, transform.up);
-                    targetDirection += (offset - combinedDirection) - offset;
-                }
-
-                combinedDirection = horizontalMoveDirection + targetDirection;
-            }
-
-            // Do one last overlap check.
-            overlapCount = NonAllocCapsuleOverlap(
-                combinedDirection,
-                ref m_OverlappedColliders
-            );
-            for (int i = 0; i < overlapCount; i++)
-            {
-                if (IsOverlapping(
-                    m_OverlappedColliders[i],
-                    combinedDirection,
-                    out Vector3 direction,
-                    out float distance
-                ))
+                );
+                if (overlapped)
                 {
                     targetDirection += direction;
                 }
-
-                combinedDirection = horizontalMoveDirection + targetDirection;
             }
 
+            targetDirection = Vector3.ProjectOnPlane(targetDirection, transform.up);
+
             // Perform cast in horizontal direction plus corrected overlap direction.
+            Vector3 castDir = horizontalMoveDirection + targetDirection;
+            Vector3 castOffset = castDir.normalized * horizontalOffset;
             int hitCount = NonAllocCapsuleCast(
-                combinedDirection,
-                combinedDirection,
+                castOffset,
+                castDir,
                 ref m_RaycastHits
             );
             if (hitCount > 0)
             {
                 RaycastHit closestRaycastHit = GetClosestRaycastHitRecursive(hitCount, m_RaycastHits);
 
-                // Create direction to slide against surfaces.
-                Vector3 horizontalNormal = Vector3.ProjectOnPlane(closestRaycastHit.normal, transform.up);
-                Vector3 wallSlideDirection = Vector3.ProjectOnPlane(horizontalMoveDirection, horizontalNormal);
-                targetDirection += (wallSlideDirection - (closestRaycastHit.distance > 0.0f ? horizontalMoveDirection : Vector3.zero));
+                if (closestRaycastHit.distance == 0)
+                {
+                    overlapCount = NonAllocCapsuleOverlap(
+                        castOffset,
+                        ref m_OverlappedColliders
+                    );
+                    for (int i = 0; i < overlapCount; i++)
+                    {
+                        bool overlapped = IsOverlapping(
+                            m_OverlappedColliders[i],
+                            targetDirection,
+                            out Vector3 direction,
+                            out float distance
+                        );
+                        if (overlapped)
+                        {
+                            targetDirection += direction;
+                        }
+                    }
+
+                    targetDirection -= horizontalMoveDirection;
+                    targetDirection = Vector3.ProjectOnPlane(targetDirection, transform.up);
+
+                    // float radiusMultiplier = ECCColliderHelper.GetCapsuleRadiusScale(m_Collider);
+                    // float radius = (m_Collider.radius * radiusMultiplier) + COLLIDER_OFFSET;
+                    // ECCColliderHelper.CalculateCapsuleCaps(
+                    //     m_Collider,
+                    //     m_Collider.transform.position + targetDirection,
+                    //     m_Collider.transform.rotation,
+                    //     out Vector3 capStart,
+                    //     out Vector3 capEnd
+                    // );
+
+                    // RaycastHit hit;
+                    // bool wasHit = Physics.CapsuleCast(
+                    //     capStart,
+                    //     capEnd,
+                    //     radius,
+                    //     horizontalMoveDirection.normalized,
+                    //     out hit,
+                    //     horizontalMoveDirection.magnitude,
+                    //     ~m_CharacterLayer.value
+                    // );
+                    // if (wasHit)
+                    // {
+                    //     // Vector3 horizontalNormal = Vector3.ProjectOnPlane(closestRaycastHit.normal, transform.up);
+                    //     // Vector3 wallDirection = Vector3.ProjectOnPlane(targetDirection, horizontalNormal);
+
+                    //     // // Create direction to slide against surfaces.
+                    //     // targetDirection = targetDirection + (targetDirection - (wallDirection.normalized * targetDirection.magnitude));
+                    // }
+                }
+                else
+                {
+                    Vector3 horizontalNormal = Vector3.ProjectOnPlane(closestRaycastHit.normal, transform.up);
+                    Vector3 wallDirection = Vector3.ProjectOnPlane(horizontalMoveDirection, horizontalNormal);
+
+                    // Create direction to slide against surfaces.
+                    targetDirection += wallDirection.normalized * horizontalMoveDirection.magnitude - horizontalMoveDirection;
+                }
             }
 
             ClearRaycasts();
 
-            combinedDirection = horizontalMoveDirection + targetDirection;
-            m_MoveDirection = combinedDirection + (m_MoveDirection - horizontalMoveDirection);
+            m_MoveDirection += targetDirection;
         }
 
         // TODO: https://app.asana.com/0/1200147678177766/1200147678177807
