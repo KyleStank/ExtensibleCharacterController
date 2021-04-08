@@ -1,13 +1,12 @@
-#if UNITY_EDITOR
-using UnityEditor;
-
-using ExtensibleCharacterController.Editor;
-#endif
 
 using System.Collections.Generic;
 using System.Reflection;
 
 using UnityEngine;
+using UPhysics = UnityEngine.Physics;
+
+using RotaryHeart.Lib.PhysicsExtension;
+using Physics = RotaryHeart.Lib.PhysicsExtension.Physics;
 
 using ExtensibleCharacterController.Core.Variables;
 using ExtensibleCharacterController.Core.Utility;
@@ -26,7 +25,9 @@ namespace ExtensibleCharacterController.Characters
         [SerializeField]
         private ECCBoolReference m_UseGravity = true;
         [SerializeField]
-        private ECCFloatReference m_Gravity = -Physics.gravity.y;
+        private ECCFloatReference m_Gravity = -UPhysics.gravity.y;
+        [SerializeField]
+        private ECCFloatReference m_TimeScale = 1.0f;
 
         [Header("Collision Settings")]
         [SerializeField]
@@ -41,6 +42,12 @@ namespace ExtensibleCharacterController.Characters
         private ECCFloatReference m_MaxStep = 0.3f;
         [SerializeField]
         private ECCFloatReference m_MaxSlopeAngle = 60.0f;
+
+        [Header("Debug Settings")]
+        [SerializeField]
+        private ECCBoolReference m_DebugHorizontalCollisionCast = false;
+        [SerializeField]
+        private ECCBoolReference m_DebugHorizontalWallCast = false;
 
         [Header("Behaviours")]
         [SerializeField]
@@ -153,6 +160,8 @@ namespace ExtensibleCharacterController.Characters
 
         private void Update()
         {
+            Time.timeScale = m_TimeScale;
+
             // TODO: Input should not be handled in this class.
             m_Input = m_Controller != null ? m_Controller.GetInput() : Vector2.zero;
             Vector2 input = m_Input.normalized * Mathf.Max(Mathf.Abs(m_Input.x), Mathf.Abs(m_Input.y));
@@ -171,6 +180,7 @@ namespace ExtensibleCharacterController.Characters
             m_GravityDirection = -transform.up;
 
             // Apply motor and gravity forces.
+            m_GravityFactor = 0.0f;
             m_MoveDirection += (m_Motor + (m_UseGravity ? (m_GravityDirection * (m_Gravity * m_GravityFactor)) : Vector3.zero)) * Time.fixedDeltaTime;
 
             // // Adjusts the move direction to smoothly move over any vertical or horizontal surface.
@@ -178,7 +188,7 @@ namespace ExtensibleCharacterController.Characters
 
             // Detect collisions and make adjustments to the move direction as needed.
             DetectHorizontalCollisions();
-            DetectVerticalCollisions();
+            // DetectVerticalCollisions();
 
             #if UNITY_EDITOR
             // Draw final movement direction.
@@ -268,7 +278,8 @@ namespace ExtensibleCharacterController.Characters
             int hitCount = NonAllocCapsuleCast(
                 horizontalOffset,
                 normalizedHorizontalDirection,
-                ref m_RaycastHits
+                ref m_RaycastHits,
+                m_DebugHorizontalCollisionCast
             );
 
             if (hitCount > 0)
@@ -305,10 +316,52 @@ namespace ExtensibleCharacterController.Characters
                     Vector3 horizontalNormal = Vector3.ProjectOnPlane(hitNormal, transform.up);
                     Vector3 surfaceDirection = Vector3.ProjectOnPlane(horizontalMoveDirection, horizontalNormal);
                     targetDirection += surfaceDirection.normalized * horizontalDirectionMagnitude;
+
+                    ClearRaycasts();
+
+                    // Do another cast in the target direction to make sure direction is correct.
+                    Vector3 normalizedTargetDirection = targetDirection.normalized;
+                    hitCount = NonAllocCapsuleCast(
+                        (normalizedHorizontalDirection + normalizedTargetDirection) * COLLIDER_OFFSET,
+                        (horizontalMoveDirection + targetDirection).normalized,
+                        ref m_RaycastHits,
+                        m_DebugHorizontalWallCast
+                    );
+
+                    if (hitCount > 0)
+                    {
+                        horizontalHit = GetClosestRaycastHitRecursive(hitCount, m_RaycastHits);
+                        hitPoint = horizontalHit.point;
+                        hitNormal = horizontalHit.normal;
+                        colliderPoint = GetClosestColliderPoint(m_Collider, horizontalOffset, hitPoint);
+
+                        distanceFromCollider = (hitPoint - colliderPoint).sqrMagnitude - COLLIDER_OFFSET;
+                        if (distanceFromCollider < m_HorizontalSkinWidth)
+                        {
+                            // Check if character can step over.
+                            localHitPoint = transform.InverseTransformPoint(hitPoint);
+                            if (localHitPoint.y <= m_MaxStep + COLLIDER_OFFSET)
+                            {
+                                // If character can step over, do not continue.
+                                // Prevents horizontal collision correction from running while on a slope.
+                                Physics.Raycast(
+                                    hitPoint - targetDirection,
+                                    normalizedTargetDirection,
+                                    out m_SingleRaycastHit,
+                                    m_HorizontalSkinWidth,
+                                    ~m_CharacterLayer.value
+                                );
+                                float slopeAngle = Vector3.Angle(transform.up, m_SingleRaycastHit.normal);
+                                if (slopeAngle <= m_MaxSlopeAngle + COLLIDER_OFFSET) return;
+                            }
+
+                            // If something was hit and not stepped over, it is a real collision.
+                            // Subtract all horizontal directions from target direction to stop movement.
+                            targetDirection -= targetDirection + horizontalMoveDirection;
+                        }
+                    }
                 }
             }
-
-            ClearRaycasts();
 
             m_MoveDirection += targetDirection;
         }
@@ -412,7 +465,7 @@ namespace ExtensibleCharacterController.Characters
 
             // Set radius of capsule to account for scale and small offset.
             m_Collider.radius = overlapRadius;
-            bool overlapped = Physics.ComputePenetration(
+            bool overlapped = UPhysics.ComputePenetration(
                 m_Collider, m_Collider.transform.position + offset, m_Collider.transform.rotation,
                 collider, collider.transform.position, collider.transform.rotation,
                 out direction, out distance
@@ -427,8 +480,7 @@ namespace ExtensibleCharacterController.Characters
 
             return overlapped;
         }
-
-        private int NonAllocCapsuleCast(Vector3 offset, Vector3 direction, ref RaycastHit[] hits)
+        private int NonAllocCapsuleCast(Vector3 offset, Vector3 direction, ref RaycastHit[] hits, bool debugDraw = false)
         {
             float radiusMultiplier = ECCColliderHelper.GetCapsuleRadiusScale(m_Collider);
             float radius = (m_Collider.radius * radiusMultiplier) + COLLIDER_OFFSET;
@@ -440,10 +492,22 @@ namespace ExtensibleCharacterController.Characters
                 out Vector3 capEnd
             );
 
-            return Physics.CapsuleCastNonAlloc(capStart, capEnd, radius, direction.normalized, hits, direction.magnitude, ~m_CharacterLayer.value);
+            return Physics.CapsuleCastNonAlloc(
+                capStart,
+                capEnd,
+                radius,
+                direction.normalized,
+                hits,
+                direction.magnitude,
+                ~m_CharacterLayer.value,
+                debugDraw ? PreviewCondition.Both : PreviewCondition.None,
+                0.0f,
+                Color.red,
+                Color.green
+            );
         }
 
-        private int NonAllocCapsuleOverlap(Vector3 offset, ref Collider[] colliders)
+        private int NonAllocCapsuleOverlap(Vector3 offset, ref Collider[] colliders, bool debugDraw = false)
         {
             float radiusMultiplier = ECCColliderHelper.GetCapsuleRadiusScale(m_Collider);
             float radius = (m_Collider.radius * radiusMultiplier) + COLLIDER_OFFSET;
@@ -455,7 +519,17 @@ namespace ExtensibleCharacterController.Characters
                 out Vector3 capEnd
             );
 
-            return Physics.OverlapCapsuleNonAlloc(capStart, capEnd, radius, colliders, ~m_CharacterLayer.value);
+            return Physics.OverlapCapsuleNonAlloc(
+                capStart,
+                capEnd,
+                radius,
+                colliders,
+                ~m_CharacterLayer.value,
+                debugDraw ? PreviewCondition.Both : PreviewCondition.None,
+                0.0f,
+                Color.red,
+                Color.green
+            );
         }
 
         private void ClearRaycasts()

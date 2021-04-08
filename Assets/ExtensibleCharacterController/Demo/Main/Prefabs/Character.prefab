@@ -244,6 +244,10 @@ MonoBehaviour:
     m_UseConstantValue: 1
     m_ConstantValue: 9
     m_Variable: {fileID: 0}
+  m_TimeScale:
+    m_UseConstantValue: 1
+    m_ConstantValue: 1
+    m_Variable: {fileID: 0}
   m_MaxCollisions:
     m_UseConstantValue: 1
     m_ConstantValue: 10
@@ -258,11 +262,19 @@ MonoBehaviour:
     m_Variable: {fileID: 0}
   m_MaxStep:
     m_UseConstantValue: 1
-    m_ConstantValue: 0
+    m_ConstantValue: 0.3
     m_Variable: {fileID: 0}
   m_MaxSlopeAngle:
     m_UseConstantValue: 1
     m_ConstantValue: 80
+    m_Variable: {fileID: 0}
+  m_DebugHorizontalCollisionCast:
+    m_UseConstantValue: 1
+    m_ConstantValue: 0
+    m_Variable: {fileID: 0}
+  m_DebugHorizontalWallCast:
+    m_UseConstantValue: 1
+    m_ConstantValue: 1
     m_Variable: {fileID: 0}
   m_CharacterBehaviourNames:
   - ECCMovementBehaviour
