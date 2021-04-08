@@ -658,9 +658,9 @@ PlayerSettings:
     WebGL: 1
     iOS: 0
   il2cppCompilerConfiguration:
-    Standalone: 1
+    Standalone: 0
   managedStrippingLevel:
-    Standalone: 3
+    Standalone: 1
   incrementalIl2cppBuild: {}
   suppressCommonWarnings: 1
   allowUnsafeCode: 0

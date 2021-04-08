@@ -76,9 +76,9 @@ namespace ExtensibleCharacterController.Characters
             m_RaycastHits = new RaycastHit[m_MaxCollisions];
             m_OverlappedColliders = new Collider[m_MaxCollisions];
 
-            // TODO: Create custom inspector that adds through dropdown rather than manual string type names.
-            // TODO: Create custom inspector to drag and order the priority of each behaviour.
-            m_CharacterBehaviours = FindCharacterBehaviours();
+            // // TODO: Create custom inspector that adds through dropdown rather than manual string type names.
+            // // TODO: Create custom inspector to drag and order the priority of each behaviour.
+            // m_CharacterBehaviours = FindCharacterBehaviours();
 
             m_Rigidbody = GetComponent<Rigidbody>();
             SetupRigidbody();
@@ -89,9 +89,9 @@ namespace ExtensibleCharacterController.Characters
 
             m_Controller = GetComponent<IECCCharacterController>();
 
-            // TODO: Does not work in Runtime build. Fix.
-            for (int i = 0; i < m_CharacterBehaviours.Count; i++)
-                m_CharacterBehaviours[i].Initialize();
+            // // TODO: Does not work in Runtime build. Fix.
+            // for (int i = 0; i < m_CharacterBehaviours.Count; i++)
+            //     m_CharacterBehaviours[i].Initialize();
         }
 
         /// <summary>

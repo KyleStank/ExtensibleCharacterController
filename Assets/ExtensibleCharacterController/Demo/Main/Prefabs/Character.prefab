@@ -206,7 +206,7 @@ Rigidbody:
   m_AngularDrag: 0.05
   m_UseGravity: 0
   m_IsKinematic: 1
-  m_Interpolate: 1
+  m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
 --- !u!114 &279154574
@@ -248,13 +248,17 @@ MonoBehaviour:
     m_UseConstantValue: 1
     m_ConstantValue: 10
     m_Variable: {fileID: 0}
+  m_HorizontalSkinWidth:
+    m_UseConstantValue: 1
+    m_ConstantValue: 0.1
+    m_Variable: {fileID: 0}
   m_SkinWidth:
     m_UseConstantValue: 1
     m_ConstantValue: 0.3
     m_Variable: {fileID: 0}
   m_MaxStep:
     m_UseConstantValue: 1
-    m_ConstantValue: 0.3
+    m_ConstantValue: 0
     m_Variable: {fileID: 0}
   m_MaxSlopeAngle:
     m_UseConstantValue: 1
