@@ -2752,7 +2752,7 @@ Transform:
   m_LocalScale: {x: 0.5958602, y: 15.725726, z: 22.350706}
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 6
+  m_RootOrder: 5
   m_LocalEulerAnglesHint: {x: 21.642, y: 12.902, z: 108.579}
 --- !u!1 &435407833
 GameObject:
@@ -9194,7 +9194,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 7
+  m_RootOrder: 6
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1611663726
 GameObject:
@@ -10252,7 +10252,7 @@ Transform:
   m_LocalScale: {x: 0.5958603, y: 3.0012074, z: 9.936426}
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 5
+  m_RootOrder: 4
   m_LocalEulerAnglesHint: {x: -29.848, y: 0, z: 90}
 --- !u!1 &1837696893
 GameObject:
@@ -10607,25 +10607,44 @@ PrefabInstance:
   m_Modification:
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 279154574, guid: 1952abc1557af4b44bc45626c631c10b, type: 3}
+      propertyPath: m_TimeScale.m_ConstantValue
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 3544393312556234890, guid: 1952abc1557af4b44bc45626c631c10b,
+        type: 3}
+      propertyPath: m_Interpolate
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3544393312556234890, guid: 1952abc1557af4b44bc45626c631c10b,
+        type: 3}
+      propertyPath: m_CollisionDetection
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4243156454373855708, guid: 1952abc1557af4b44bc45626c631c10b,
+        type: 3}
+      propertyPath: m_Speed
+      value: 15
+      objectReference: {fileID: 0}
     - target: {fileID: 6384343835097644696, guid: 1952abc1557af4b44bc45626c631c10b,
         type: 3}
       propertyPath: m_RootOrder
-      value: 4
+      value: 7
       objectReference: {fileID: 0}
     - target: {fileID: 6384343835097644696, guid: 1952abc1557af4b44bc45626c631c10b,
         type: 3}
       propertyPath: m_LocalPosition.x
-      value: 6.719
+      value: 3.945
       objectReference: {fileID: 0}
     - target: {fileID: 6384343835097644696, guid: 1952abc1557af4b44bc45626c631c10b,
         type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.035000004
+      value: -0.027
       objectReference: {fileID: 0}
     - target: {fileID: 6384343835097644696, guid: 1952abc1557af4b44bc45626c631c10b,
         type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0.682
+      value: 3.849
       objectReference: {fileID: 0}
     - target: {fileID: 6384343835097644696, guid: 1952abc1557af4b44bc45626c631c10b,
         type: 3}
