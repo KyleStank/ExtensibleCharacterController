@@ -237,7 +237,7 @@ namespace ExtensibleCharacterController.Characters
 
             if (hitCount > 0)
             {
-                RaycastHit hit = GetClosestRaycastHitRecursive(hitCount, m_RaycastHits);
+                RaycastHit hit = ECCPhysicsHelper.GetClosestRaycastHitRecursive(m_Collider, hitCount, m_RaycastHits);
 
                 m_MoveDirection += CreateSlopeDirection(horizontalMoveDirection, hit.normal);
             }
@@ -287,20 +287,32 @@ namespace ExtensibleCharacterController.Characters
 
             // Perform capsule cast in horizontal direction.
             // Vector3 horizontalOffset = normalizedHorizontalDirection * COLLIDER_OFFSET + m_DeltaVelocity;
-            Vector3 horizontalOffset = -(normalizedHorizontalDirection / 2.0f) + m_DeltaVelocity;
+            Vector3 horizontalOffset = -(normalizedHorizontalDirection) + m_DeltaVelocity;
             int hitCount = NonAllocCapsuleCast(
                 horizontalOffset,
-                normalizedHorizontalDirection,
+                normalizedHorizontalDirection * 2.0f,
                 ref m_RaycastHits,
                 m_DebugHorizontalCollisionCast
             );
 
+            if (hitCount == 2)
+            {
+                for (int i = 0; i < hitCount; i++)
+                {
+                    RaycastHit hit = ECCPhysicsHelper.GetClosestRaycastHitRecursive(m_Collider, hitCount, m_RaycastHits, debug: true);
+                    Debug.Log("Name: " + hit.collider.name);
+                    Debug.Log("Distance: " + hit.distance);
+                    Debug.Log("Point: X:" + hit.point.x + " - Y: " + hit.point.y + "Z: " + hit.point.z);
+                }
+                Debug.Break();
+            }
+
             if (hitCount > 0)
             {
-                RaycastHit horizontalHit = GetClosestRaycastHitRecursive(hitCount, m_RaycastHits);
+                RaycastHit horizontalHit = ECCPhysicsHelper.GetClosestRaycastHitRecursive(m_Collider, hitCount, m_RaycastHits);
                 Vector3 hitPoint = horizontalHit.point;
                 Vector3 hitNormal = horizontalHit.normal;
-                Vector3 colliderPoint = GetClosestColliderPoint(m_Collider, m_DeltaVelocity, hitPoint);
+                Vector3 colliderPoint = ECCPhysicsHelper.GetClosestColliderPoint(m_Collider, m_DeltaVelocity, hitPoint);
 
                 float distanceFromCollider = (hitPoint - colliderPoint).magnitude - COLLIDER_OFFSET;
                 if (distanceFromCollider < m_HorizontalSkinWidth)
@@ -343,7 +355,7 @@ namespace ExtensibleCharacterController.Characters
                     {
                         targetDirection +=
                             surfaceDirection.normalized * horizontalDirectionMagnitude * m_HorizontalSlideFrictionFactor
-                            + (correctionDirection - horizontalMoveDirection);
+                            - (horizontalMoveDirection + correctionDirection);
                     }
                     else
                     {
@@ -352,74 +364,83 @@ namespace ExtensibleCharacterController.Characters
 
                     ClearRaycasts();
 
-                    // // Do another cast in the target direction to make sure direction is correct.
-                    // // hitCount = NonAllocCapsuleCast(
-                    // //     (normalizedHorizontalDirection + normalizedTargetDirection) * COLLIDER_OFFSET + m_DeltaVelocity,
-                    // //     (horizontalMoveDirection + targetDirection).normalized,
-                    // //     ref m_RaycastHits,
-                    // //     m_DebugHorizontalWallCast
-                    // // );
-                    // Vector3 normalizedTargetDirection = targetDirection.normalized;
-                    // float targetDirectionMagnitude = targetDirection.magnitude;
-                    // Vector3 normalizedSlideOffsetDirection = (horizontalMoveDirection + targetDirection).normalized;
+                    // Do another cast in the target direction to make sure direction is correct.
                     // hitCount = NonAllocCapsuleCast(
-                    //     -(normalizedSlideOffsetDirection / 2.0f) + m_DeltaVelocity,
-                    //     normalizedSlideOffsetDirection,
+                    //     (normalizedHorizontalDirection + normalizedTargetDirection) * COLLIDER_OFFSET + m_DeltaVelocity,
+                    //     (horizontalMoveDirection + targetDirection).normalized,
                     //     ref m_RaycastHits,
                     //     m_DebugHorizontalWallCast
                     // );
+                    Vector3 normalizedTargetDirection = targetDirection.normalized;
+                    float targetDirectionMagnitude = targetDirection.magnitude;
+                    Vector3 normalizedSlideOffsetDirection = (horizontalMoveDirection + targetDirection).normalized;
+                    hitCount = NonAllocCapsuleCast(
+                        -(normalizedSlideOffsetDirection / 2.0f) + m_DeltaVelocity,
+                        normalizedSlideOffsetDirection,
+                        ref m_RaycastHits,
+                        m_DebugHorizontalWallCast
+                    );
 
-                    // if (hitCount > 0)
-                    // {
-                    //     horizontalHit = GetClosestRaycastHitRecursive(hitCount, m_RaycastHits);
-                    //     hitPoint = horizontalHit.point;
-                    //     hitNormal = horizontalHit.normal;
-                    //     colliderPoint = GetClosestColliderPoint(m_Collider, m_DeltaVelocity, hitPoint);
+                    if (hitCount > 0)
+                    {
+                        horizontalHit = ECCPhysicsHelper.GetClosestRaycastHitRecursive(m_Collider, hitCount, m_RaycastHits);
+                        hitPoint = horizontalHit.point;
+                        hitNormal = horizontalHit.normal;
+                        colliderPoint = ECCPhysicsHelper.GetClosestColliderPoint(m_Collider, m_DeltaVelocity, hitPoint);
 
-                    //     distanceFromCollider = (hitPoint - colliderPoint).magnitude - COLLIDER_OFFSET;
-                    //     if (distanceFromCollider < m_HorizontalSkinWidth)
-                    //     {
-                    //         // Check if character can step over.
-                    //         localHitPoint = transform.InverseTransformPoint(hitPoint);
-                    //         if (localHitPoint.y <= m_MaxStep + COLLIDER_OFFSET)
-                    //         {
-                    //             // If character can step over, do not continue.
-                    //             // Prevents horizontal collision correction from running while on a slope.
-                    //             Physics.Raycast(
-                    //                 hitPoint - normalizedSlideOffsetDirection,
-                    //                 normalizedTargetDirection,
-                    //                 out m_SingleRaycastHit,
-                    //                 m_HorizontalSkinWidth,
-                    //                 ~m_CharacterLayer.value
-                    //             );
-                    //             float slopeAngle = Vector3.Angle(transform.up, m_SingleRaycastHit.normal);
-                    //             if (slopeAngle <= m_MaxSlopeAngle + COLLIDER_OFFSET) return;
-                    //         }
+                        distanceFromCollider = (hitPoint - colliderPoint).magnitude - COLLIDER_OFFSET;
+                        if (distanceFromCollider < m_HorizontalSkinWidth)
+                        {
+                            // // Check if character can step over.
+                            // localHitPoint = transform.InverseTransformPoint(hitPoint);
+                            // if (localHitPoint.y <= m_MaxStep + COLLIDER_OFFSET)
+                            // {
+                            //     // If character can step over, do not continue.
+                            //     // Prevents horizontal collision correction from running while on a slope.
+                            //     bool hit = Physics.Raycast(
+                            //         hitPoint - normalizedSlideOffsetDirection,
+                            //         normalizedTargetDirection,
+                            //         out m_SingleRaycastHit,
+                            //         m_HorizontalSkinWidth,
+                            //         ~m_CharacterLayer.value,
+                            //         PreviewCondition.Both,
+                            //         0.0f,
+                            //         Color.red,
+                            //         Color.green,
+                            //         true
+                            //     );
+                            //     if (hit)
+                            //     {
+                            //         Debug.Break();
+                            //     }
+                            //     // float slopeAngle = Vector3.Angle(transform.up, m_SingleRaycastHit.normal);
+                            //     // if (slopeAngle <= m_MaxSlopeAngle + COLLIDER_OFFSET) return;
+                            // }
 
-                    //         // Find actual distance from skin width. Then apply the difference. Allows character to get as close to surface as possible.
-                    //         correctionDistance = m_HorizontalSkinWidth - distanceFromCollider;
-                    //         if (correctionDistance < m_HorizontalSkinWidth)
-                    //         {
-                    //             targetDirection +=
-                    //                 normalizedTargetDirection * targetDirectionMagnitude
-                    //                 * ((m_HorizontalSkinWidth - distanceFromCollider) * Time.fixedDeltaTime * targetDirectionMagnitude);
-                    //         }
+                            // // Find actual distance from skin width. Then apply the difference. Allows character to get as close to surface as possible.
+                            // correctionDistance = m_HorizontalSkinWidth - distanceFromCollider;
+                            // if (correctionDistance < m_HorizontalSkinWidth)
+                            // {
+                            //     targetDirection +=
+                            //         normalizedTargetDirection * targetDirectionMagnitude
+                            //         * ((m_HorizontalSkinWidth - distanceFromCollider) * Time.fixedDeltaTime * targetDirectionMagnitude);
+                            // }
 
-                    //         // Create direction that allows character to slide off surfaces.
-                    //         // Uses same magnitude as horizontal direction, so make sure to remove horizontal direction before applying target direction.
-                    //         horizontalNormal = Vector3.ProjectOnPlane(hitNormal, transform.up);
-                    //         surfaceDirection = Vector3.ProjectOnPlane(targetDirection, horizontalNormal);
+                            // // Create direction that allows character to slide off surfaces.
+                            // // Uses same magnitude as horizontal direction, so make sure to remove horizontal direction before applying target direction.
+                            // horizontalNormal = Vector3.ProjectOnPlane(hitNormal, transform.up);
+                            // surfaceDirection = Vector3.ProjectOnPlane(targetDirection, horizontalNormal);
 
-                    //         // Apply surface direction, corrected distance direction, and then remove original horizontal direction.
-                    //         targetDirection +=
-                    //             surfaceDirection.normalized * targetDirectionMagnitude * m_HorizontalSlideFrictionFactor
-                    //             - (targetDirection);
+                            // // Apply surface direction, corrected distance direction, and then remove original horizontal direction.
+                            // targetDirection +=
+                            //     surfaceDirection.normalized * targetDirectionMagnitude * m_HorizontalSlideFrictionFactor
+                            //     - (targetDirection);
 
-                    //         // // If something was hit and not stepped over, it is a real collision.
-                    //         // // Subtract all horizontal directions from target direction to stop movement.
-                    //         // targetDirection -= targetDirection + horizontalMoveDirection;
-                    //     }
-                    // }
+                            // // If something was hit and not stepped over, it is a real collision.
+                            // // Subtract all horizontal directions from target direction to stop movement.
+                            // targetDirection -= targetDirection + horizontalMoveDirection;
+                        }
+                    }
                 }
             }
 
@@ -444,7 +465,7 @@ namespace ExtensibleCharacterController.Characters
                 m_IsGrounded = true;
                 m_GravityFactor = 0.0f;
 
-                RaycastHit hit = GetClosestRaycastHitRecursive(hitCount, m_RaycastHits);
+                RaycastHit hit = ECCPhysicsHelper.GetClosestRaycastHitRecursive(m_Collider, hitCount, m_RaycastHits);
 
                 // If slope is too high, do not continue.
                 float slopeAngle = Vector3.Angle(transform.up, hit.normal);
@@ -520,7 +541,7 @@ namespace ExtensibleCharacterController.Characters
         private bool IsOverlapping(Collider collider, Vector3 offset, out Vector3 direction, out float distance)
         {
             float capsuleRadius = m_Collider.radius;
-            float radiusMultiplier = ECCColliderHelper.GetCapsuleRadiusScale(m_Collider);
+            float radiusMultiplier = ECCPhysicsHelper.GetCapsuleRadiusScale(m_Collider);
             float overlapRadius = (capsuleRadius * radiusMultiplier) + COLLIDER_OFFSET;
 
             // Set radius of capsule to account for scale and small offset.
@@ -542,9 +563,9 @@ namespace ExtensibleCharacterController.Characters
         }
         private int NonAllocCapsuleCast(Vector3 offset, Vector3 direction, ref RaycastHit[] hits, bool debugDraw = false)
         {
-            float radiusMultiplier = ECCColliderHelper.GetCapsuleRadiusScale(m_Collider);
+            float radiusMultiplier = ECCPhysicsHelper.GetCapsuleRadiusScale(m_Collider);
             float radius = (m_Collider.radius * radiusMultiplier) + COLLIDER_OFFSET;
-            ECCColliderHelper.CalculateCapsuleCaps(
+            ECCPhysicsHelper.CalculateCapsuleCaps(
                 m_Collider,
                 m_Collider.transform.position + offset,
                 m_Collider.transform.rotation,
@@ -569,9 +590,9 @@ namespace ExtensibleCharacterController.Characters
 
         private int NonAllocCapsuleOverlap(Vector3 offset, ref Collider[] colliders, bool debugDraw = false)
         {
-            float radiusMultiplier = ECCColliderHelper.GetCapsuleRadiusScale(m_Collider);
+            float radiusMultiplier = ECCPhysicsHelper.GetCapsuleRadiusScale(m_Collider);
             float radius = (m_Collider.radius * radiusMultiplier) + COLLIDER_OFFSET;
-            ECCColliderHelper.CalculateCapsuleCaps(
+            ECCPhysicsHelper.CalculateCapsuleCaps(
                 m_Collider,
                 m_Collider.transform.position + offset,
                 m_Collider.transform.rotation,
@@ -598,35 +619,6 @@ namespace ExtensibleCharacterController.Characters
             {
                 m_RaycastHits[i] = default(RaycastHit);
             }
-        }
-
-        private Vector3 GetClosestColliderPoint(Collider collider, Vector3 offset, Vector3 point)
-        {
-            collider.transform.position += offset;
-            Vector3 closestPoint = collider.ClosestPoint(point);
-            collider.transform.position -= offset;
-
-            return closestPoint;
-        }
-
-        // TODO: Placeholder for now. Eventually expand this method to require the index field and grab the closest point based on that.
-        private RaycastHit GetClosestRaycastHitRecursive(int hitCount, RaycastHit[] hits, int index = 0, RaycastHit closestHit = default(RaycastHit))
-        {
-            // Get next index, current hit, and the next hit.
-            int nextIndex = index + 1;
-            RaycastHit currentHit = hits[index];
-            RaycastHit nextHit = nextIndex < hitCount ? hits[nextIndex] : currentHit;
-
-            // Set closest hit to current hit if it hasn't been assigned anything.
-            closestHit = closestHit.Equals(default(RaycastHit)) ? currentHit : closestHit;
-
-            // If the next hit is closer, then it is the new closest hit.
-            if (nextHit.distance + COLLIDER_OFFSET < closestHit.distance + COLLIDER_OFFSET)
-            {
-                closestHit = nextHit;
-            }
-
-            return nextIndex < hitCount ? GetClosestRaycastHitRecursive(hitCount, hits, nextIndex, closestHit) : closestHit;
         }
 
         #if UNITY_EDITOR

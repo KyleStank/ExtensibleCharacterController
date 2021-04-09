@@ -3,9 +3,9 @@ using UnityEngine;
 namespace ExtensibleCharacterController.Core.Utility
 {
     /// <summary>
-    /// Static class containing various different helper methods related to colliders.
+    /// Static class containing various different helper methods related to Physics.
     /// </summary>
-    public static class ECCColliderHelper
+    public static class ECCPhysicsHelper
     {
         /// <summary>
         /// Calculates the start and end cap values required for a CapsuleCast.
@@ -185,6 +185,85 @@ namespace ExtensibleCharacterController.Core.Utility
                 direction.magnitude,
                 invertLayerMask ? ~layerMask.value : layerMask.value
             );
+        }
+
+        /// <summary>
+        /// Loops through an array of RaycastHits and returned the closest one, relative to a collider's position.
+        /// </summary>
+        /// <param name="collider">Collider to check against.</param>
+        /// <param name="hitCount">Amount of Raycasts in array.</param>
+        /// <param name="hits">Array of Raycasts.</param>
+        /// <param name="offset">Offset to apply to collider position.</param>
+        /// <param name="distanceOffset">Optional offset to apply to distance checking. Useful for adding small padding.</param>
+        /// <param name="index">Parameter used by recursion for tracking the index of the RaycastHit to check.</param>
+        /// <param name="closestHit">Parameter used by recursion for tracking the closest RaycastHit.</param>
+        /// <returns></returns>
+        public static RaycastHit GetClosestRaycastHitRecursive(
+            Collider collider,
+            int hitCount,
+            RaycastHit[] hits,
+            Vector3? offset = null,
+            float distanceOffset = 0.0f,
+            bool debug = false,
+            int index = 0,
+            RaycastHit? closestHit = null
+        )
+        {
+            // horizontalHit = GetClosestRaycastHitRecursive(hitCount, m_RaycastHits);
+            // hitPoint = horizontalHit.point;
+            // hitNormal = horizontalHit.normal;
+            // colliderPoint = GetClosestColliderPoint(m_Collider, m_DeltaVelocity, hitPoint);
+
+            // distanceFromCollider = (hitPoint - colliderPoint).magnitude - COLLIDER_OFFSET;
+
+            // Get next index, current hit, and the next hit.
+            int nextIndex = index + 1;
+            RaycastHit currentHit = hits[index];
+            RaycastHit nextHit = nextIndex < hitCount ? hits[nextIndex] : currentHit;
+
+            Vector3 hitPoint = currentHit.point;
+            Vector3 hitNormal = currentHit.normal;
+            Vector3 colliderPoint = GetClosestColliderPoint(collider, offset != null ? (Vector3)offset : Vector3.zero, hitPoint);
+            float distanceFromCollider = (hitPoint - colliderPoint).magnitude;
+            if (debug)
+            {
+                Debug.Log(distanceFromCollider);
+            }
+
+            // Set closest hit to current hit if it hasn't been assigned anything.
+            closestHit = closestHit != null ? (RaycastHit)closestHit : default(RaycastHit);
+
+            // If current hit is inside collider, use next ray instead.
+            if (currentHit.distance == 0 && nextIndex < hitCount)
+            {
+                return GetClosestRaycastHitRecursive(collider, hitCount, hits, offset, distanceOffset, debug, nextIndex, closestHit);
+            }
+
+            // If the next hit is closer, then it is the new closest hit.
+            if (nextHit.distance + distanceOffset < ((RaycastHit)closestHit).distance + distanceOffset)
+            {
+                closestHit = nextHit;
+            }
+
+            return nextIndex < hitCount ?
+                GetClosestRaycastHitRecursive(collider, hitCount, hits, offset, distanceOffset, debug, nextIndex, closestHit) :
+                (RaycastHit)closestHit;
+        }
+
+        /// <summary>
+        /// Returns the closest world on a Collider relative to another point.
+        /// </summary>
+        /// <param name="collider">Collider to check.</param>
+        /// <param name="offset">Offset to apply to collider's position before checking.</param>
+        /// <param name="point">Relative point used to find closest point.</param>
+        /// <returns>Vector3 world point on collider.</returns>
+        public static Vector3 GetClosestColliderPoint(Collider collider, Vector3 offset, Vector3 point)
+        {
+            collider.transform.position += offset;
+            Vector3 closestPoint = collider.ClosestPoint(point);
+            collider.transform.position -= offset;
+
+            return closestPoint;
         }
     }
 }
