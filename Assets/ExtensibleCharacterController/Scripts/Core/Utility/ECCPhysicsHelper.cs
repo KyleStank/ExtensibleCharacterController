@@ -193,7 +193,7 @@ namespace ExtensibleCharacterController.Core.Utility
         /// <param name="collider">Collider to check against.</param>
         /// <param name="hitCount">Amount of Raycasts in array.</param>
         /// <param name="hits">Array of Raycasts.</param>
-        /// <param name="offset">Offset to apply to collider position.</param>
+        /// <param name="offset">Optional offset to apply to collider position.</param>
         /// <param name="distanceOffset">Optional offset to apply to distance checking. Useful for adding small padding.</param>
         /// <param name="index">Parameter used by recursion for tracking the index of the RaycastHit to check.</param>
         /// <param name="closestHit">Parameter used by recursion for tracking the closest RaycastHit.</param>
@@ -206,48 +206,66 @@ namespace ExtensibleCharacterController.Core.Utility
             float distanceOffset = 0.0f,
             bool debug = false,
             int index = 0,
-            RaycastHit? closestHit = null
+            RaycastHit closestHit = default(RaycastHit)
         )
         {
-            // horizontalHit = GetClosestRaycastHitRecursive(hitCount, m_RaycastHits);
-            // hitPoint = horizontalHit.point;
-            // hitNormal = horizontalHit.normal;
-            // colliderPoint = GetClosestColliderPoint(m_Collider, m_DeltaVelocity, hitPoint);
-
-            // distanceFromCollider = (hitPoint - colliderPoint).magnitude - COLLIDER_OFFSET;
-
             // Get next index, current hit, and the next hit.
             int nextIndex = index + 1;
             RaycastHit currentHit = hits[index];
             RaycastHit nextHit = nextIndex < hitCount ? hits[nextIndex] : currentHit;
 
-            Vector3 hitPoint = currentHit.point;
-            Vector3 hitNormal = currentHit.normal;
-            Vector3 colliderPoint = GetClosestColliderPoint(collider, offset != null ? (Vector3)offset : Vector3.zero, hitPoint);
-            float distanceFromCollider = (hitPoint - colliderPoint).magnitude;
-            if (debug)
-            {
-                Debug.Log(distanceFromCollider);
-            }
-
             // Set closest hit to current hit if it hasn't been assigned anything.
-            closestHit = closestHit != null ? (RaycastHit)closestHit : default(RaycastHit);
+            closestHit = closestHit.Equals(default(RaycastHit)) ? currentHit : closestHit;
 
-            // If current hit is inside collider, use next ray instead.
-            if (currentHit.distance == 0 && nextIndex < hitCount)
-            {
-                return GetClosestRaycastHitRecursive(collider, hitCount, hits, offset, distanceOffset, debug, nextIndex, closestHit);
-            }
+            // Calculate distances for next hit and closest hit.
+            CalculateClosestRaycastHitDistances(
+                collider,
+                offset != null ? (Vector3)offset : Vector3.zero,
+                nextHit,
+                closestHit,
+                out float nextDistance,
+                out float closestDistance
+            );
 
             // If the next hit is closer, then it is the new closest hit.
-            if (nextHit.distance + distanceOffset < ((RaycastHit)closestHit).distance + distanceOffset)
+            if (nextDistance - distanceOffset < closestDistance)
             {
                 closestHit = nextHit;
             }
 
             return nextIndex < hitCount ?
                 GetClosestRaycastHitRecursive(collider, hitCount, hits, offset, distanceOffset, debug, nextIndex, closestHit) :
-                (RaycastHit)closestHit;
+                closestHit;
+        }
+
+        /// <summary>
+        /// Calculates the distance of the hit point from the closest collider point for the next RaycastHit and the closest RaycastHit.
+        /// Used the GetClosestRaycastHitRecursive() method only.
+        /// </summary>
+        /// <param name="collider">Collider to check against.</param>
+        /// <param name="offset">Offset to apply to collider position.</param>
+        /// <param name="nextHit">Next RaycastHit to check.</param>
+        /// <param name="closestHit">Closest RaycastHit to check.</param>
+        /// <param name="nextDistance">Outputted distance from next Raycast's point to the next collider point.</param>
+        /// <param name="closestDistance">Outputted distance from closest Raycast's point to the closest collider point.</param>
+        private static void CalculateClosestRaycastHitDistances(
+            Collider collider,
+            Vector3 offset,
+            RaycastHit nextHit,
+            RaycastHit closestHit,
+            out float nextDistance,
+            out float closestDistance
+        )
+        {
+            // Calculate distances for next hit and closest hit.
+            Vector3 colliderOffset = offset != null ? (Vector3)offset : Vector3.zero;
+            Vector3 nextHitPoint = nextHit.point;
+            Vector3 nextColliderPoint = GetClosestColliderPoint(collider, colliderOffset, nextHitPoint);
+            nextDistance = (nextHitPoint - nextColliderPoint).sqrMagnitude;
+
+            Vector3 closestHitPoint = closestHit.point;
+            Vector3 closestColliderPoint = GetClosestColliderPoint(collider, colliderOffset, closestHitPoint);
+            closestDistance = (closestHitPoint - closestColliderPoint).sqrMagnitude;
         }
 
         /// <summary>

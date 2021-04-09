@@ -295,21 +295,15 @@ namespace ExtensibleCharacterController.Characters
                 m_DebugHorizontalCollisionCast
             );
 
-            if (hitCount == 2)
-            {
-                for (int i = 0; i < hitCount; i++)
-                {
-                    RaycastHit hit = ECCPhysicsHelper.GetClosestRaycastHitRecursive(m_Collider, hitCount, m_RaycastHits, debug: true);
-                    Debug.Log("Name: " + hit.collider.name);
-                    Debug.Log("Distance: " + hit.distance);
-                    Debug.Log("Point: X:" + hit.point.x + " - Y: " + hit.point.y + "Z: " + hit.point.z);
-                }
-                Debug.Break();
-            }
-
             if (hitCount > 0)
             {
-                RaycastHit horizontalHit = ECCPhysicsHelper.GetClosestRaycastHitRecursive(m_Collider, hitCount, m_RaycastHits);
+                RaycastHit horizontalHit = ECCPhysicsHelper.GetClosestRaycastHitRecursive(
+                    m_Collider,
+                    hitCount,
+                    m_RaycastHits,
+                    m_DeltaVelocity,
+                    COLLIDER_OFFSET
+                );
                 Vector3 hitPoint = horizontalHit.point;
                 Vector3 hitNormal = horizontalHit.normal;
                 Vector3 colliderPoint = ECCPhysicsHelper.GetClosestColliderPoint(m_Collider, m_DeltaVelocity, hitPoint);
