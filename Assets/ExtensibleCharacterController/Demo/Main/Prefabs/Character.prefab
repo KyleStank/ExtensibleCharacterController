@@ -241,7 +241,7 @@ MonoBehaviour:
   m_TimeScale: 1
   m_MaxCollisions: 10
   m_HorizontalSkinWidth: 0.1
-  m_HorizontalSurfaceSlideAngleMinimum: 30
+  m_HorizontalSurfaceSlideAngleMinimum: 0
   m_HorizontalSlideFrictionFactor: 1
   m_SkinWidth: 0.1
   m_MaxStep: 0

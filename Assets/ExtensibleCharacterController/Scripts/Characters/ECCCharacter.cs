@@ -82,6 +82,8 @@ namespace ExtensibleCharacterController.Characters
         private Vector2 m_Input = Vector2.zero;
         private Vector3 m_Motor = Vector3.zero;
         private Vector3 m_DeltaVelocity = Vector3.zero;
+        private Vector3 m_HorizontalDeltaVelocity = Vector3.zero;
+        private Vector3 m_VerticalDeltaVelocity = Vector3.zero;
 
         protected override void Initialize()
         {
@@ -205,6 +207,11 @@ namespace ExtensibleCharacterController.Characters
             m_Rigidbody.MovePosition(m_Rigidbody.position + m_MoveDirection);
 
             m_DeltaVelocity = m_Rigidbody.velocity * Time.fixedDeltaTime;
+            m_HorizontalDeltaVelocity = Vector3.ProjectOnPlane(m_DeltaVelocity, transform.up);
+            m_VerticalDeltaVelocity = Vector3.ProjectOnPlane(
+                Vector3.ProjectOnPlane(m_DeltaVelocity, transform.forward),
+                transform.right
+            );
             m_MoveDirection = Vector3.zero;
         }
 
@@ -237,7 +244,13 @@ namespace ExtensibleCharacterController.Characters
 
             if (hitCount > 0)
             {
-                RaycastHit hit = ECCPhysicsHelper.GetClosestRaycastHitRecursive(m_Collider, hitCount, m_RaycastHits);
+                RaycastHit hit = ECCPhysicsHelper.GetClosestRaycastHitRecursive(
+                    m_Collider,
+                    hitCount,
+                    m_RaycastHits,
+                    m_DeltaVelocity,
+                    COLLIDER_OFFSET
+                );
 
                 m_MoveDirection += CreateSlopeDirection(horizontalMoveDirection, hit.normal);
             }
@@ -286,11 +299,10 @@ namespace ExtensibleCharacterController.Characters
             }
 
             // Perform capsule cast in horizontal direction.
-            // Vector3 horizontalOffset = normalizedHorizontalDirection * COLLIDER_OFFSET + m_DeltaVelocity;
-            Vector3 horizontalOffset = -(normalizedHorizontalDirection) + m_DeltaVelocity;
+            Vector3 horizontalOffset = -(normalizedHorizontalDirection / 2.0f) + m_HorizontalDeltaVelocity;
             int hitCount = NonAllocCapsuleCast(
                 horizontalOffset,
-                normalizedHorizontalDirection * 2.0f,
+                normalizedHorizontalDirection,
                 ref m_RaycastHits,
                 m_DebugHorizontalCollisionCast
             );
@@ -301,16 +313,17 @@ namespace ExtensibleCharacterController.Characters
                     m_Collider,
                     hitCount,
                     m_RaycastHits,
-                    m_DeltaVelocity,
+                    m_HorizontalDeltaVelocity,
                     COLLIDER_OFFSET
                 );
                 Vector3 hitPoint = horizontalHit.point;
                 Vector3 hitNormal = horizontalHit.normal;
-                Vector3 colliderPoint = ECCPhysicsHelper.GetClosestColliderPoint(m_Collider, m_DeltaVelocity, hitPoint);
+                Vector3 colliderPoint = ECCPhysicsHelper.GetClosestColliderPoint(m_Collider, m_HorizontalDeltaVelocity, hitPoint);
 
                 float distanceFromCollider = (hitPoint - colliderPoint).magnitude - COLLIDER_OFFSET;
                 if (distanceFromCollider < m_HorizontalSkinWidth)
                 {
+                    // TODO: Test this to ensure it still works.
                     // Check if character can step over.
                     Vector3 localHitPoint = transform.InverseTransformPoint(hitPoint);
                     if (localHitPoint.y <= m_MaxStep + COLLIDER_OFFSET)
@@ -360,7 +373,7 @@ namespace ExtensibleCharacterController.Characters
 
                     // Do another cast in the target direction to make sure direction is correct.
                     // hitCount = NonAllocCapsuleCast(
-                    //     (normalizedHorizontalDirection + normalizedTargetDirection) * COLLIDER_OFFSET + m_DeltaVelocity,
+                    //     (normalizedHorizontalDirection + normalizedTargetDirection) * COLLIDER_OFFSET + m_HorizontalDeltaVelocity,
                     //     (horizontalMoveDirection + targetDirection).normalized,
                     //     ref m_RaycastHits,
                     //     m_DebugHorizontalWallCast
@@ -369,7 +382,7 @@ namespace ExtensibleCharacterController.Characters
                     float targetDirectionMagnitude = targetDirection.magnitude;
                     Vector3 normalizedSlideOffsetDirection = (horizontalMoveDirection + targetDirection).normalized;
                     hitCount = NonAllocCapsuleCast(
-                        -(normalizedSlideOffsetDirection / 2.0f) + m_DeltaVelocity,
+                        -(normalizedSlideOffsetDirection / 2.0f) + m_HorizontalDeltaVelocity,
                         normalizedSlideOffsetDirection,
                         ref m_RaycastHits,
                         m_DebugHorizontalWallCast
@@ -377,10 +390,16 @@ namespace ExtensibleCharacterController.Characters
 
                     if (hitCount > 0)
                     {
-                        horizontalHit = ECCPhysicsHelper.GetClosestRaycastHitRecursive(m_Collider, hitCount, m_RaycastHits);
+                        horizontalHit = ECCPhysicsHelper.GetClosestRaycastHitRecursive(
+                            m_Collider,
+                            hitCount,
+                            m_RaycastHits,
+                            m_HorizontalDeltaVelocity,
+                            COLLIDER_OFFSET
+                        );
                         hitPoint = horizontalHit.point;
                         hitNormal = horizontalHit.normal;
-                        colliderPoint = ECCPhysicsHelper.GetClosestColliderPoint(m_Collider, m_DeltaVelocity, hitPoint);
+                        colliderPoint = ECCPhysicsHelper.GetClosestColliderPoint(m_Collider, m_HorizontalDeltaVelocity, hitPoint);
 
                         distanceFromCollider = (hitPoint - colliderPoint).magnitude - COLLIDER_OFFSET;
                         if (distanceFromCollider < m_HorizontalSkinWidth)
@@ -459,7 +478,13 @@ namespace ExtensibleCharacterController.Characters
                 m_IsGrounded = true;
                 m_GravityFactor = 0.0f;
 
-                RaycastHit hit = ECCPhysicsHelper.GetClosestRaycastHitRecursive(m_Collider, hitCount, m_RaycastHits);
+                RaycastHit hit = ECCPhysicsHelper.GetClosestRaycastHitRecursive(
+                    m_Collider,
+                    hitCount,
+                    m_RaycastHits,
+                    m_VerticalDeltaVelocity,
+                    COLLIDER_OFFSET
+                );
 
                 // If slope is too high, do not continue.
                 float slopeAngle = Vector3.Angle(transform.up, hit.normal);
