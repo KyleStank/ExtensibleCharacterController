@@ -28,14 +28,16 @@ namespace ExtensibleCharacterController.Characters
         private ECCFloatReference m_Gravity = -UPhysics.gravity.y;
         [SerializeField]
         private ECCFloatReference m_TimeScale = 1.0f;
-
-        [Header("Collision Settings")]
         [SerializeField]
         private ECCIntReference m_MaxCollisions = 10;
+
+        [Header("Horizontal Collision Settings")]
         [SerializeField]
         private ECCFloatReference m_HorizontalSkinWidth = 0.1f;
+        [SerializeField]
+        private ECCFloatReference m_HorizontalSlideFrictionFactor = 1.0f;
 
-        [Header("Ground Settings")]
+        [Header("Vertical Collision Settings")]
         [SerializeField]
         private ECCFloatReference m_SkinWidth = 0.1f;
         [SerializeField]
@@ -77,6 +79,7 @@ namespace ExtensibleCharacterController.Characters
         private IECCCharacterController m_Controller;
         private Vector2 m_Input = Vector2.zero;
         private Vector3 m_Motor = Vector3.zero;
+        private Vector3 m_DeltaVelocity = Vector3.zero;
 
         protected override void Initialize()
         {
@@ -172,9 +175,9 @@ namespace ExtensibleCharacterController.Characters
         private void FixedUpdate()
         {
             // TODO: Move elsewhere when ready.
-            Vector3 eulerRot = transform.rotation.eulerAngles;
+            Vector3 eulerRot = m_Rigidbody.rotation.eulerAngles;
             eulerRot.y = Camera.main.transform.eulerAngles.y;
-            transform.rotation = Quaternion.Euler(eulerRot);
+            m_Rigidbody.rotation = Quaternion.Euler(eulerRot);
 
             // Set gravity direction every frame to account for rotation changes.
             m_GravityDirection = -transform.up;
@@ -197,7 +200,9 @@ namespace ExtensibleCharacterController.Characters
 
             // Move character after all calculations are completed.
             // Make sure move direction is multiplied by delta time as the direction vector is too large for per-frame movement.
-            transform.position += m_MoveDirection;
+            m_Rigidbody.MovePosition(m_Rigidbody.position + m_MoveDirection);
+
+            m_DeltaVelocity = m_Rigidbody.velocity * Time.fixedDeltaTime;
             m_MoveDirection = Vector3.zero;
         }
 
@@ -272,9 +277,14 @@ namespace ExtensibleCharacterController.Characters
 
             Vector3 normalizedHorizontalDirection = horizontalMoveDirection.normalized;
             float horizontalDirectionMagnitude = horizontalMoveDirection.magnitude;
+            if (horizontalDirectionMagnitude <= 0.001f)
+            {
+                m_MoveDirection -= horizontalMoveDirection;
+                return;
+            }
 
             // Perform capsule cast in horizontal direction.
-            Vector3 horizontalOffset = normalizedHorizontalDirection * COLLIDER_OFFSET;
+            Vector3 horizontalOffset = normalizedHorizontalDirection * COLLIDER_OFFSET + m_DeltaVelocity;
             int hitCount = NonAllocCapsuleCast(
                 horizontalOffset,
                 normalizedHorizontalDirection,
@@ -315,14 +325,14 @@ namespace ExtensibleCharacterController.Characters
                     // Create direction that allows character to slide off surfaces.
                     Vector3 horizontalNormal = Vector3.ProjectOnPlane(hitNormal, transform.up);
                     Vector3 surfaceDirection = Vector3.ProjectOnPlane(horizontalMoveDirection, horizontalNormal);
-                    targetDirection += surfaceDirection.normalized * horizontalDirectionMagnitude;
+                    targetDirection += surfaceDirection.normalized * horizontalDirectionMagnitude * m_HorizontalSlideFrictionFactor;
 
                     ClearRaycasts();
 
                     // Do another cast in the target direction to make sure direction is correct.
                     Vector3 normalizedTargetDirection = targetDirection.normalized;
                     hitCount = NonAllocCapsuleCast(
-                        (normalizedHorizontalDirection + normalizedTargetDirection) * COLLIDER_OFFSET,
+                        (normalizedHorizontalDirection + normalizedTargetDirection) * COLLIDER_OFFSET + m_DeltaVelocity,
                         (horizontalMoveDirection + targetDirection).normalized,
                         ref m_RaycastHits,
                         m_DebugHorizontalWallCast

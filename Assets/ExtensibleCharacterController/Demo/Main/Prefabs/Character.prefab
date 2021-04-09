@@ -256,13 +256,17 @@ MonoBehaviour:
     m_UseConstantValue: 1
     m_ConstantValue: 0.1
     m_Variable: {fileID: 0}
+  m_HorizontalSlideFrictionFactor:
+    m_UseConstantValue: 1
+    m_ConstantValue: 1
+    m_Variable: {fileID: 0}
   m_SkinWidth:
     m_UseConstantValue: 1
     m_ConstantValue: 0.3
     m_Variable: {fileID: 0}
   m_MaxStep:
     m_UseConstantValue: 1
-    m_ConstantValue: 0.3
+    m_ConstantValue: 0
     m_Variable: {fileID: 0}
   m_MaxSlopeAngle:
     m_UseConstantValue: 1
@@ -270,7 +274,7 @@ MonoBehaviour:
     m_Variable: {fileID: 0}
   m_DebugHorizontalCollisionCast:
     m_UseConstantValue: 1
-    m_ConstantValue: 0
+    m_ConstantValue: 1
     m_Variable: {fileID: 0}
   m_DebugHorizontalWallCast:
     m_UseConstantValue: 1
@@ -290,4 +294,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cffc492ab2d9ddb40a83ec12b0a9dbe8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_Speed: 15
+  m_Speed: 5
