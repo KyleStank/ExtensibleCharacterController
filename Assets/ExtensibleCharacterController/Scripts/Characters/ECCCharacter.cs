@@ -1,4 +1,3 @@
-
 using System.Collections.Generic;
 using System.Reflection;
 
@@ -8,7 +7,6 @@ using UPhysics = UnityEngine.Physics;
 using RotaryHeart.Lib.PhysicsExtension;
 using Physics = RotaryHeart.Lib.PhysicsExtension.Physics;
 
-using ExtensibleCharacterController.Core.Variables;
 using ExtensibleCharacterController.Core.Utility;
 using ExtensibleCharacterController.Characters.Behaviours;
 
@@ -20,36 +18,67 @@ namespace ExtensibleCharacterController.Characters
         private const float COLLIDER_OFFSET = 0.01f;
 
         [Header("Generic Settings")]
+        [Tooltip("Enable/disable all character functionality, including movement, collisions, gravity, and character behaviours.")]
         [SerializeField]
-        private LayerMask m_CharacterLayer;
+        private bool m_MotorEnabled = true;
+        [Tooltip(
+            "Layers that collision tests will ignore." + " " +
+            "Always make sure to create a specific layer for the character, assign it to this game object, and select that layer here." + " " +
+            "If this is not done, the character could theoretically collide with itself. To be cautious, always use a character-specific layer."
+        )]
+        [SerializeField]
+        private LayerMask m_CollisionIgnoreLayer;
+        [Tooltip("Enable/disable gravity for the character.")]
         [SerializeField]
         private bool m_UseGravity = true;
+        [Tooltip("Amount of force that is applied to the gravity direction.")]
         [SerializeField]
         private float m_Gravity = -UPhysics.gravity.y;
-        [SerializeField]
-        private float m_TimeScale = 1.0f;
+        [Tooltip("Maximum amount of collisions that character can detect per frame.")]
         [SerializeField]
         private int m_MaxCollisions = 10;
 
         [Header("Horizontal Collision Settings")]
+        [Tooltip(
+            "Distance that is used during horizontal collision detection to prevent the character from clipping through surfaces." + " " +
+            "The higher the value, the farther away the character will be from collision points, and vice-versa." + " " +
+            "The default value should be fine in most scenarios."
+        )]
         [SerializeField]
         private float m_HorizontalSkinWidth = 0.1f;
+        [Tooltip(
+            "The minimum angle that the character must be, relative to a horizontal surface, before surface sliding begins." + " " +
+            "If the angle is 0, the character will slide against every surface. If the angle is 90, the character will never slide against a surface."
+        )]
         [SerializeField]
         private float m_HorizontalSurfaceSlideAngleMinimum = 15.0f;
+        [Tooltip("Friction multiplier applied to surface sliding.")]
         [SerializeField]
         private float m_HorizontalSlideFrictionFactor = 1.0f;
 
         [Header("Vertical Collision Settings")]
+        [Tooltip(
+            "Distance that is used during vertical collision detection to detect the ground surface." + " " +
+            "The higher the value, the bigger the gap between the character and ground is required before considered grounded, and vice-versa." + " " +
+            "The default value should be fine in most scenarios."
+        )]
         [SerializeField]
         private float m_SkinWidth = 0.1f;
+        [Tooltip("The maximum height that the character can step over.")]
         [SerializeField]
         private float m_MaxStep = 0.3f;
+        [Tooltip("The maximum slope angle that the character can move over.")]
         [SerializeField]
         private float m_MaxSlopeAngle = 60.0f;
 
         [Header("Debug Settings")]
+        [Tooltip("Change the global time scale. Useful for slowly visualizing changes to a fast character.")]
+        [SerializeField]
+        private float m_TimeScale = 1.0f;
+        [Tooltip("Visually indicates the primary horizontal collision test. Drawn in the Editor and at Runtime.")]
         [SerializeField]
         private bool m_DebugHorizontalCollisionCast = false;
+        [Tooltip("Visually indicates the horizontal collision test that happens when sliding on a surface. Drawn in the Editor and at Runtime.")]
         [SerializeField]
         private bool m_DebugHorizontalWallCast = false;
 
@@ -199,12 +228,15 @@ namespace ExtensibleCharacterController.Characters
 
             #if UNITY_EDITOR
             // Draw final movement direction.
-            Debug.DrawRay(transform.position, m_MoveDirection.normalized, Color.magenta);
+            Debug.DrawRay(transform.position, m_MoveDirection, Color.magenta);
             #endif
 
             // Move character after all calculations are completed.
             // Make sure move direction is multiplied by delta time as the direction vector is too large for per-frame movement.
-            m_Rigidbody.MovePosition(m_Rigidbody.position + m_MoveDirection);
+            if (m_MotorEnabled)
+            {
+                m_Rigidbody.MovePosition(m_Rigidbody.position + m_MoveDirection);
+            }
 
             m_DeltaVelocity = m_Rigidbody.velocity * Time.fixedDeltaTime;
             m_HorizontalDeltaVelocity = Vector3.ProjectOnPlane(m_DeltaVelocity, transform.up);
@@ -335,7 +367,7 @@ namespace ExtensibleCharacterController.Characters
                             normalizedHorizontalDirection,
                             out m_SingleRaycastHit,
                             m_HorizontalSkinWidth,
-                            ~m_CharacterLayer.value
+                            ~m_CollisionIgnoreLayer.value
                         );
                         float slopeAngle = Vector3.Angle(transform.up, m_SingleRaycastHit.normal);
                         if (slopeAngle <= m_MaxSlopeAngle + COLLIDER_OFFSET) return;
@@ -519,7 +551,7 @@ namespace ExtensibleCharacterController.Characters
                         horizontalMoveDirection.normalized,
                         out m_SingleRaycastHit,
                         m_HorizontalSkinWidth,
-                        ~m_CharacterLayer.value
+                        ~m_CollisionIgnoreLayer.value
                     );
                     float angle = Vector3.Angle(transform.up, m_SingleRaycastHit.normal);
                     if (slopeAngle <= m_MaxSlopeAngle + COLLIDER_OFFSET)
@@ -599,7 +631,7 @@ namespace ExtensibleCharacterController.Characters
                 direction.normalized,
                 hits,
                 direction.magnitude,
-                ~m_CharacterLayer.value,
+                ~m_CollisionIgnoreLayer.value,
                 debugDraw ? PreviewCondition.Both : PreviewCondition.None,
                 0.0f,
                 Color.red,
@@ -624,7 +656,7 @@ namespace ExtensibleCharacterController.Characters
                 capEnd,
                 radius,
                 colliders,
-                ~m_CharacterLayer.value,
+                ~m_CollisionIgnoreLayer.value,
                 debugDraw ? PreviewCondition.Both : PreviewCondition.None,
                 0.0f,
                 Color.red,

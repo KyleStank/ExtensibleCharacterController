@@ -233,12 +233,12 @@ MonoBehaviour:
     m_UseConstantValue: 1
     m_ConstantValue: 1
     m_Variable: {fileID: 0}
-  m_CharacterLayer:
+  m_MotorEnabled: 1
+  m_CollisionIgnoreLayer:
     serializedVersion: 2
     m_Bits: 2147483648
   m_UseGravity: 0
   m_Gravity: 9.81
-  m_TimeScale: 1
   m_MaxCollisions: 10
   m_HorizontalSkinWidth: 0.1
   m_HorizontalSurfaceSlideAngleMinimum: 0
@@ -246,6 +246,7 @@ MonoBehaviour:
   m_SkinWidth: 0.1
   m_MaxStep: 0
   m_MaxSlopeAngle: 80
+  m_TimeScale: 1
   m_DebugHorizontalCollisionCast: 1
   m_DebugHorizontalWallCast: 1
   m_CharacterBehaviourNames:
