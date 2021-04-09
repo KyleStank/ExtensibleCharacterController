@@ -204,7 +204,6 @@ namespace ExtensibleCharacterController.Core.Utility
             RaycastHit[] hits,
             Vector3? offset = null,
             float distanceOffset = 0.0f,
-            bool debug = false,
             int index = 0,
             RaycastHit closestHit = default(RaycastHit)
         )
@@ -234,7 +233,7 @@ namespace ExtensibleCharacterController.Core.Utility
             }
 
             return nextIndex < hitCount ?
-                GetClosestRaycastHitRecursive(collider, hitCount, hits, offset, distanceOffset, debug, nextIndex, closestHit) :
+                GetClosestRaycastHitRecursive(collider, hitCount, hits, offset, distanceOffset, nextIndex, closestHit) :
                 closestHit;
         }
 
