@@ -54,7 +54,7 @@ namespace ExtensibleCharacterController.Characters
         private float m_HorizontalSurfaceSlideAngleMinimum = 15.0f;
         [Tooltip("Friction multiplier applied to surface sliding.")]
         [SerializeField]
-        private float m_HorizontalSlideFrictionFactor = 1.0f;
+        private float m_HorizontalFrictionFactor = 1.0f;
 
         [Header("Vertical Collision Settings")]
         [Tooltip(
@@ -228,7 +228,7 @@ namespace ExtensibleCharacterController.Characters
 
             #if UNITY_EDITOR
             // Draw final movement direction.
-            Debug.DrawRay(transform.position, m_MoveDirection, Color.magenta);
+            Debug.DrawRay(m_Rigidbody.position + m_DeltaVelocity, m_MoveDirection, Color.magenta);
             #endif
 
             // Move character after all calculations are completed.
@@ -255,7 +255,7 @@ namespace ExtensibleCharacterController.Characters
 
             #if UNITY_EDITOR
             // Draw horizontal direction.
-            Debug.DrawRay(transform.position, horizontalMoveDirection.normalized, Color.green);
+            Debug.DrawRay(m_Rigidbody.position + m_DeltaVelocity, horizontalMoveDirection.normalized, Color.green);
             #endif
 
             // Cast in downward position.
@@ -268,7 +268,7 @@ namespace ExtensibleCharacterController.Characters
             #if UNITY_EDITOR
             // Draw bottom of capsule cast ray.
             Debug.DrawRay(
-                (m_Collider.transform.position + (transform.up * COLLIDER_OFFSET)) + (m_GravityDirection * (m_Collider.height / 2.0f)),
+                ((m_Collider.transform.position + m_DeltaVelocity) + (transform.up * COLLIDER_OFFSET)) + (m_GravityDirection * (m_Collider.height / 2.0f)),
                 m_GravityDirection * m_SkinWidth,
                 hitCount > 0 ? Color.red : Color.green
             );
@@ -320,7 +320,7 @@ namespace ExtensibleCharacterController.Characters
         {
             // float horizontalOffset = 0.05f;
             Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MoveDirection, transform.up);
-            Vector3 targetDirection = Vector3.zero;
+            Vector3 targetDirection = horizontalMoveDirection;
 
             Vector3 normalizedHorizontalDirection = horizontalMoveDirection.normalized;
             float horizontalDirectionMagnitude = horizontalMoveDirection.magnitude;
@@ -352,144 +352,146 @@ namespace ExtensibleCharacterController.Characters
                 Vector3 hitNormal = horizontalHit.normal;
                 Vector3 colliderPoint = ECCPhysicsHelper.GetClosestColliderPoint(m_Collider, m_HorizontalDeltaVelocity, hitPoint);
 
-                float distanceFromCollider = (hitPoint - colliderPoint).magnitude - COLLIDER_OFFSET;
-                if (distanceFromCollider < m_HorizontalSkinWidth)
+                float colliderDistance = (hitPoint - colliderPoint).magnitude - COLLIDER_OFFSET;
+                if (colliderDistance <= m_HorizontalSkinWidth)
                 {
-                    // TODO: Test this to ensure it still works.
-                    // Check if character can step over.
-                    Vector3 localHitPoint = transform.InverseTransformPoint(hitPoint);
-                    if (localHitPoint.y <= m_MaxStep + COLLIDER_OFFSET)
-                    {
-                        // If character can step over, do not continue.
-                        // Prevents horizontal collision correction from running while on a slope.
-                        Physics.Raycast(
-                            hitPoint - horizontalOffset,
-                            normalizedHorizontalDirection,
-                            out m_SingleRaycastHit,
-                            m_HorizontalSkinWidth,
-                            ~m_CollisionIgnoreLayer.value
-                        );
-                        float slopeAngle = Vector3.Angle(transform.up, m_SingleRaycastHit.normal);
-                        if (slopeAngle <= m_MaxSlopeAngle + COLLIDER_OFFSET) return;
-                    }
+                    // // TODO: Test this to ensure it still works.
+                    // // Check if character can step over.
+                    // Vector3 localHitPoint = transform.InverseTransformPoint(hitPoint);
+                    // if (localHitPoint.y <= m_MaxStep + COLLIDER_OFFSET)
+                    // {
+                    //     // If character can step over, do not continue.
+                    //     // Prevents horizontal collision correction from running while on a slope.
+                    //     Physics.Raycast(
+                    //         hitPoint - horizontalOffset,
+                    //         horizontalMoveDirection,
+                    //         out m_SingleRaycastHit,
+                    //         m_HorizontalSkinWidth,
+                    //         ~m_CollisionIgnoreLayer.value
+                    //     );
+                    //     float slopeAngle = Vector3.Angle(transform.up, m_SingleRaycastHit.normal);
+                    //     if (slopeAngle <= m_MaxSlopeAngle + COLLIDER_OFFSET) return;
+                    // }
 
-                    // Find actual distance from skin width. Then apply the difference. Allows character to get as close to surface as possible.
-                    Vector3 correctionDirection = Vector3.zero;
-                    float correctionDistance = m_HorizontalSkinWidth - distanceFromCollider;
-                    if (correctionDistance < m_HorizontalSkinWidth)
-                    {
-                        correctionDirection +=
-                            normalizedHorizontalDirection * horizontalDirectionMagnitude
-                            * ((m_HorizontalSkinWidth - distanceFromCollider) * Time.fixedDeltaTime * horizontalDirectionMagnitude);
-                    }
+                    // // Find actual distance from skin width. Then apply the difference. Allows character to get as close to surface as possible.
+                    // Vector3 correctionDirection = Vector3.zero;
+                    // float correctionDistance = m_HorizontalSkinWidth - distanceFromCollider;
+                    // if (correctionDistance < m_HorizontalSkinWidth)
+                    // {
+                    //     correctionDirection +=
+                    //         normalizedHorizontalDirection * horizontalDirectionMagnitude
+                    //         * ((m_HorizontalSkinWidth - distanceFromCollider) * Time.fixedDeltaTime * horizontalDirectionMagnitude);
+                    // }
 
-                    // Create direction that allows character to slide off surfaces.
+                    // Create direction that allows character to slide off surfaces by projecting the horizontal direction onto the hit surface.
                     // Uses same magnitude as horizontal direction, so make sure to remove horizontal direction before applying target direction.
                     Vector3 horizontalNormal = Vector3.ProjectOnPlane(hitNormal, transform.up);
-                    Vector3 surfaceDirection = Vector3.ProjectOnPlane(horizontalMoveDirection, horizontalNormal);
-                    float surfaceAngle = 90.0f - Vector3.Angle(horizontalMoveDirection, surfaceDirection);
+                    Vector3 surfaceDirection = Vector3.ProjectOnPlane(horizontalMoveDirection, horizontalNormal).normalized;
 
-                    // Apply surface direction, corrected distance direction, and then remove original horizontal direction.
+                    float surfaceAngle = 90.0f - Vector3.Angle(horizontalMoveDirection, surfaceDirection);
                     if (surfaceAngle >= m_HorizontalSurfaceSlideAngleMinimum)
                     {
-                        targetDirection +=
-                            surfaceDirection.normalized * horizontalDirectionMagnitude * m_HorizontalSlideFrictionFactor
-                            - (horizontalMoveDirection + correctionDirection);
-                    }
-                    else
-                    {
-                        targetDirection -= horizontalMoveDirection + correctionDirection;
+                        // Calculate the strength of the surface direction based on the direction of the horizontal move direction.
+                        // The Dot product of the normalized horizontal direction and inverse horizontal normal is perfect, as it uses cosine.
+                        float surfaceDirectionStrength = 1.0f - Vector3.Dot(normalizedHorizontalDirection, -horizontalNormal);
+
+                        // If the horizontal magnitude is greater than the radius of the collider, than the collider point distance will be used.
+                        // This will prevent overlap. Collisions behave odd if an object moves more than its radius and has another collision next frame.
+                        float surfaceDirectionDistance = Mathf.Min(horizontalHit.distance - COLLIDER_OFFSET, horizontalDirectionMagnitude);
+
+                        // Calculate the surface move direction by multiplying the surface direction by all of our factor values.
+                        targetDirection = surfaceDirection * (surfaceDirectionDistance * surfaceDirectionStrength) * m_HorizontalFrictionFactor;
                     }
 
                     ClearRaycasts();
-
-                    // Do another cast in the target direction to make sure direction is correct.
-                    // hitCount = NonAllocCapsuleCast(
-                    //     (normalizedHorizontalDirection + normalizedTargetDirection) * COLLIDER_OFFSET + m_HorizontalDeltaVelocity,
-                    //     (horizontalMoveDirection + targetDirection).normalized,
-                    //     ref m_RaycastHits,
-                    //     m_DebugHorizontalWallCast
-                    // );
-                    Vector3 normalizedTargetDirection = targetDirection.normalized;
-                    float targetDirectionMagnitude = targetDirection.magnitude;
-                    Vector3 normalizedSlideOffsetDirection = (horizontalMoveDirection + targetDirection).normalized;
-                    hitCount = NonAllocCapsuleCast(
-                        -(normalizedSlideOffsetDirection / 2.0f) + m_HorizontalDeltaVelocity,
-                        normalizedSlideOffsetDirection,
-                        ref m_RaycastHits,
-                        m_DebugHorizontalWallCast
-                    );
-
-                    if (hitCount > 0)
-                    {
-                        horizontalHit = ECCPhysicsHelper.GetClosestRaycastHitRecursive(
-                            m_Collider,
-                            hitCount,
-                            m_RaycastHits,
-                            m_HorizontalDeltaVelocity,
-                            COLLIDER_OFFSET
-                        );
-                        hitPoint = horizontalHit.point;
-                        hitNormal = horizontalHit.normal;
-                        colliderPoint = ECCPhysicsHelper.GetClosestColliderPoint(m_Collider, m_HorizontalDeltaVelocity, hitPoint);
-
-                        distanceFromCollider = (hitPoint - colliderPoint).magnitude - COLLIDER_OFFSET;
-                        if (distanceFromCollider < m_HorizontalSkinWidth)
-                        {
-                            // // Check if character can step over.
-                            // localHitPoint = transform.InverseTransformPoint(hitPoint);
-                            // if (localHitPoint.y <= m_MaxStep + COLLIDER_OFFSET)
-                            // {
-                            //     // If character can step over, do not continue.
-                            //     // Prevents horizontal collision correction from running while on a slope.
-                            //     bool hit = Physics.Raycast(
-                            //         hitPoint - normalizedSlideOffsetDirection,
-                            //         normalizedTargetDirection,
-                            //         out m_SingleRaycastHit,
-                            //         m_HorizontalSkinWidth,
-                            //         ~m_CharacterLayer.value,
-                            //         PreviewCondition.Both,
-                            //         0.0f,
-                            //         Color.red,
-                            //         Color.green,
-                            //         true
-                            //     );
-                            //     if (hit)
-                            //     {
-                            //         Debug.Break();
-                            //     }
-                            //     // float slopeAngle = Vector3.Angle(transform.up, m_SingleRaycastHit.normal);
-                            //     // if (slopeAngle <= m_MaxSlopeAngle + COLLIDER_OFFSET) return;
-                            // }
-
-                            // // Find actual distance from skin width. Then apply the difference. Allows character to get as close to surface as possible.
-                            // correctionDistance = m_HorizontalSkinWidth - distanceFromCollider;
-                            // if (correctionDistance < m_HorizontalSkinWidth)
-                            // {
-                            //     targetDirection +=
-                            //         normalizedTargetDirection * targetDirectionMagnitude
-                            //         * ((m_HorizontalSkinWidth - distanceFromCollider) * Time.fixedDeltaTime * targetDirectionMagnitude);
-                            // }
-
-                            // // Create direction that allows character to slide off surfaces.
-                            // // Uses same magnitude as horizontal direction, so make sure to remove horizontal direction before applying target direction.
-                            // horizontalNormal = Vector3.ProjectOnPlane(hitNormal, transform.up);
-                            // surfaceDirection = Vector3.ProjectOnPlane(targetDirection, horizontalNormal);
-
-                            // // Apply surface direction, corrected distance direction, and then remove original horizontal direction.
-                            // targetDirection +=
-                            //     surfaceDirection.normalized * targetDirectionMagnitude * m_HorizontalSlideFrictionFactor
-                            //     - (targetDirection);
-
-                            // // If something was hit and not stepped over, it is a real collision.
-                            // // Subtract all horizontal directions from target direction to stop movement.
-                            // targetDirection -= targetDirection + horizontalMoveDirection;
-                        }
-                    }
                 }
             }
 
-            m_MoveDirection += targetDirection;
+            // Do another cast in the target direction to make sure direction is correct.
+            // hitCount = NonAllocCapsuleCast(
+            //     (normalizedHorizontalDirection + normalizedTargetDirection) * COLLIDER_OFFSET + m_HorizontalDeltaVelocity,
+            //     (horizontalMoveDirection + targetDirection).normalized,
+            //     ref m_RaycastHits,
+            //     m_DebugHorizontalWallCast
+            // );
+            Vector3 normalizedTargetDirection = targetDirection.normalized;
+            float targetDirectionMagnitude = targetDirection.magnitude;
+            Vector3 normalizedSlideOffsetDirection = (horizontalMoveDirection + targetDirection).normalized;
+            hitCount = NonAllocCapsuleCast(
+                -(normalizedSlideOffsetDirection / 2.0f) + m_HorizontalDeltaVelocity,
+                normalizedSlideOffsetDirection,
+                ref m_RaycastHits,
+                m_DebugHorizontalWallCast
+            );
+
+            if (hitCount > 0)
+            {
+                // horizontalHit = ECCPhysicsHelper.GetClosestRaycastHitRecursive(
+                //     m_Collider,
+                //     hitCount,
+                //     m_RaycastHits,
+                //     m_HorizontalDeltaVelocity,
+                //     COLLIDER_OFFSET
+                // );
+                // hitPoint = horizontalHit.point;
+                // hitNormal = horizontalHit.normal;
+                // colliderPoint = ECCPhysicsHelper.GetClosestColliderPoint(m_Collider, m_HorizontalDeltaVelocity, hitPoint);
+
+                // distanceFromCollider = (hitPoint - colliderPoint).magnitude - COLLIDER_OFFSET;
+                // if (distanceFromCollider < m_HorizontalSkinWidth)
+                // {
+                //     // // Check if character can step over.
+                //     // localHitPoint = transform.InverseTransformPoint(hitPoint);
+                //     // if (localHitPoint.y <= m_MaxStep + COLLIDER_OFFSET)
+                //     // {
+                //     //     // If character can step over, do not continue.
+                //     //     // Prevents horizontal collision correction from running while on a slope.
+                //     //     bool hit = Physics.Raycast(
+                //     //         hitPoint - normalizedSlideOffsetDirection,
+                //     //         normalizedTargetDirection,
+                //     //         out m_SingleRaycastHit,
+                //     //         m_HorizontalSkinWidth,
+                //     //         ~m_CharacterLayer.value,
+                //     //         PreviewCondition.Both,
+                //     //         0.0f,
+                //     //         Color.red,
+                //     //         Color.green,
+                //     //         true
+                //     //     );
+                //     //     if (hit)
+                //     //     {
+                //     //         Debug.Break();
+                //     //     }
+                //     //     // float slopeAngle = Vector3.Angle(transform.up, m_SingleRaycastHit.normal);
+                //     //     // if (slopeAngle <= m_MaxSlopeAngle + COLLIDER_OFFSET) return;
+                //     // }
+
+                //     // // Find actual distance from skin width. Then apply the difference. Allows character to get as close to surface as possible.
+                //     // correctionDistance = m_HorizontalSkinWidth - distanceFromCollider;
+                //     // if (correctionDistance < m_HorizontalSkinWidth)
+                //     // {
+                //     //     targetDirection +=
+                //     //         normalizedTargetDirection * targetDirectionMagnitude
+                //     //         * ((m_HorizontalSkinWidth - distanceFromCollider) * Time.fixedDeltaTime * targetDirectionMagnitude);
+                //     // }
+
+                //     // // Create direction that allows character to slide off surfaces.
+                //     // // Uses same magnitude as horizontal direction, so make sure to remove horizontal direction before applying target direction.
+                //     // horizontalNormal = Vector3.ProjectOnPlane(hitNormal, transform.up);
+                //     // surfaceDirection = Vector3.ProjectOnPlane(targetDirection, horizontalNormal);
+
+                //     // // Apply surface direction, corrected distance direction, and then remove original horizontal direction.
+                //     // targetDirection +=
+                //     //     surfaceDirection.normalized * targetDirectionMagnitude * m_HorizontalSlideFrictionFactor
+                //     //     - (targetDirection);
+
+                //     // // If something was hit and not stepped over, it is a real collision.
+                //     // // Subtract all horizontal directions from target direction to stop movement.
+                //     // targetDirection -= targetDirection + horizontalMoveDirection;
+                // }
+            }
+
+            m_MoveDirection = targetDirection;
         }
 
         // TODO: https://app.asana.com/0/1200147678177766/1200147678177807
