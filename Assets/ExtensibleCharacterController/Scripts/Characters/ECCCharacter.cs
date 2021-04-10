@@ -208,9 +208,9 @@ namespace ExtensibleCharacterController.Characters
         private void FixedUpdate()
         {
             // TODO: Move elsewhere when ready.
-            Vector3 eulerRot = m_Rigidbody.rotation.eulerAngles;
+            Vector3 eulerRot = transform.rotation.eulerAngles;
             eulerRot.y = Camera.main.transform.eulerAngles.y;
-            m_Rigidbody.rotation = Quaternion.Euler(eulerRot);
+            transform.rotation = Quaternion.Euler(eulerRot);
 
             // Set gravity direction every frame to account for rotation changes.
             m_GravityDirection = -transform.up;
@@ -228,22 +228,23 @@ namespace ExtensibleCharacterController.Characters
 
             #if UNITY_EDITOR
             // Draw final movement direction.
-            Debug.DrawRay(m_Rigidbody.position + m_DeltaVelocity, m_MoveDirection, Color.magenta);
+            Debug.DrawRay(transform.position + m_DeltaVelocity, m_MoveDirection, Color.magenta);
             #endif
 
             // Move character after all calculations are completed.
             // Make sure move direction is multiplied by delta time as the direction vector is too large for per-frame movement.
             if (m_MotorEnabled)
             {
-                m_Rigidbody.MovePosition(m_Rigidbody.position + m_MoveDirection);
+                transform.position += m_MoveDirection;
+                // m_Rigidbody.MovePosition(m_Rigidbody.position + m_MoveDirection);
             }
 
-            m_DeltaVelocity = m_Rigidbody.velocity * Time.fixedDeltaTime;
-            m_HorizontalDeltaVelocity = Vector3.ProjectOnPlane(m_DeltaVelocity, transform.up);
-            m_VerticalDeltaVelocity = Vector3.ProjectOnPlane(
-                Vector3.ProjectOnPlane(m_DeltaVelocity, transform.forward),
-                transform.right
-            );
+            // m_DeltaVelocity = m_Rigidbody.velocity * Time.fixedDeltaTime;
+            // m_HorizontalDeltaVelocity = Vector3.ProjectOnPlane(m_DeltaVelocity, transform.up);
+            // m_VerticalDeltaVelocity = Vector3.ProjectOnPlane(
+            //     Vector3.ProjectOnPlane(m_DeltaVelocity, transform.forward),
+            //     transform.right
+            // );
             m_MoveDirection = Vector3.zero;
         }
 
@@ -255,7 +256,7 @@ namespace ExtensibleCharacterController.Characters
 
             #if UNITY_EDITOR
             // Draw horizontal direction.
-            Debug.DrawRay(m_Rigidbody.position + m_DeltaVelocity, horizontalMoveDirection.normalized, Color.green);
+            Debug.DrawRay(transform.position + m_DeltaVelocity, horizontalMoveDirection.normalized, Color.green);
             #endif
 
             // Cast in downward position.

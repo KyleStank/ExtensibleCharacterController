@@ -170,6 +170,8 @@ GameObject:
   - component: {fileID: 3544393312556234890}
   - component: {fileID: 279154574}
   - component: {fileID: 4243156454373855708}
+  - component: {fileID: 1642326514}
+  - component: {fileID: 1642326515}
   m_Layer: 31
   m_Name: Character
   m_TagString: Player
@@ -242,13 +244,13 @@ MonoBehaviour:
   m_MaxCollisions: 10
   m_HorizontalSkinWidth: 0.1
   m_HorizontalSurfaceSlideAngleMinimum: 0
-  m_HorizontalSlideFrictionFactor: 1
+  m_HorizontalFrictionFactor: 1
   m_SkinWidth: 0.1
   m_MaxStep: 0
   m_MaxSlopeAngle: 80
   m_TimeScale: 1
   m_DebugHorizontalCollisionCast: 1
-  m_DebugHorizontalWallCast: 1
+  m_DebugHorizontalWallCast: 0
   m_CharacterBehaviourNames:
   - ECCMovementBehaviour
 --- !u!114 &4243156454373855708
@@ -264,3 +266,27 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Speed: 5
+--- !u!114 &1642326514
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6384343835097644697}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 51eda90f29cadc449b50e1d96f79868c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &1642326515
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6384343835097644697}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0a4caddd5a6cd884098a956bd433858b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 

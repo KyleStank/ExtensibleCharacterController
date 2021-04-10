@@ -1,4 +1,5 @@
 using UnityEngine;
+using UPhysics = UnityEngine.Physics;
 
 namespace ExtensibleCharacterController.Core.Utility
 {
@@ -141,7 +142,7 @@ namespace ExtensibleCharacterController.Core.Utility
         {
             Vector3 capStart, capEnd;
             CalculateCapsuleCaps(collider, collider.transform.position + offset, collider.transform.rotation, out capStart, out capEnd);
-            return Physics.CapsuleCast(
+            return UPhysics.CapsuleCast(
                 capStart,
                 capEnd,
                 collider.radius,
@@ -177,7 +178,7 @@ namespace ExtensibleCharacterController.Core.Utility
                 out Vector3 capStart,
                 out Vector3 capEnd
             );
-            return Physics.CapsuleCastAll(
+            return UPhysics.CapsuleCastAll(
                 capStart,
                 capEnd,
                 collider.radius,
