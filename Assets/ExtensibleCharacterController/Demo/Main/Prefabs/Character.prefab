@@ -242,7 +242,7 @@ MonoBehaviour:
   m_UseGravity: 0
   m_Gravity: 9.81
   m_MaxCollisions: 10
-  m_HorizontalSkinWidth: 0.1
+  m_HorizontalSkinWidth: 0.05
   m_HorizontalSurfaceSlideAngleMinimum: 0
   m_HorizontalFrictionFactor: 1
   m_SkinWidth: 0.1

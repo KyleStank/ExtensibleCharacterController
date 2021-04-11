@@ -334,8 +334,8 @@ namespace ExtensibleCharacterController.Characters
             // Perform capsule cast in horizontal direction.
             Vector3 horizontalOffset = -(normalizedHorizontalDirection / 2.0f) + m_HorizontalDeltaVelocity;
             int hitCount = NonAllocCapsuleCast(
-                horizontalOffset,
-                normalizedHorizontalDirection,
+                horizontalMoveDirection,
+                horizontalMoveDirection,
                 ref m_RaycastHits,
                 m_DebugHorizontalCollisionCast
             );
@@ -346,15 +346,15 @@ namespace ExtensibleCharacterController.Characters
                     m_Collider,
                     hitCount,
                     m_RaycastHits,
-                    m_HorizontalDeltaVelocity,
+                    horizontalMoveDirection,
                     COLLIDER_OFFSET
                 );
                 Vector3 hitPoint = horizontalHit.point;
                 Vector3 hitNormal = horizontalHit.normal;
-                Vector3 colliderPoint = ECCPhysicsHelper.GetClosestColliderPoint(m_Collider, m_HorizontalDeltaVelocity, hitPoint);
+                Vector3 colliderPoint = ECCPhysicsHelper.GetClosestColliderPoint(m_Collider, horizontalMoveDirection, hitPoint);
 
                 float colliderDistance = (hitPoint - colliderPoint).magnitude - COLLIDER_OFFSET;
-                if (colliderDistance <= m_HorizontalSkinWidth)
+                if (horizontalHit.distance - COLLIDER_OFFSET <= m_HorizontalSkinWidth)
                 {
                     // // TODO: Test this to ensure it still works.
                     // // Check if character can step over.
