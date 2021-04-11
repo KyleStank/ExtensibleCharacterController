@@ -125,9 +125,6 @@ namespace ExtensibleCharacterController.Characters
         private IECCCharacterController m_Controller;
         private Vector2 m_Input = Vector2.zero;
         private Vector3 m_Motor = Vector3.zero;
-        private Vector3 m_DeltaVelocity = Vector3.zero;
-        private Vector3 m_HorizontalDeltaVelocity = Vector3.zero;
-        private Vector3 m_VerticalDeltaVelocity = Vector3.zero;
 
         protected override void Initialize()
         {
@@ -247,7 +244,6 @@ namespace ExtensibleCharacterController.Characters
             if (m_MotorEnabled)
             {
                 transform.position += m_MoveDirection;
-                // m_Rigidbody.MovePosition(m_Rigidbody.position + m_MoveDirection);
             }
 
             #if UNITY_EDITOR
@@ -262,12 +258,6 @@ namespace ExtensibleCharacterController.Characters
             }
             #endif
 
-            // m_DeltaVelocity = m_Rigidbody.velocity * Time.fixedDeltaTime;
-            // m_HorizontalDeltaVelocity = Vector3.ProjectOnPlane(m_DeltaVelocity, transform.up);
-            // m_VerticalDeltaVelocity = Vector3.ProjectOnPlane(
-            //     Vector3.ProjectOnPlane(m_DeltaVelocity, transform.forward),
-            //     transform.right
-            // );
             m_MoveDirection = Vector3.zero;
         }
 
@@ -281,7 +271,7 @@ namespace ExtensibleCharacterController.Characters
 
         //     #if UNITY_EDITOR
         //     // Draw horizontal direction.
-        //     Debug.DrawRay(transform.position + m_DeltaVelocity, horizontalMoveDirection.normalized, Color.green);
+        //     Debug.DrawRay(transform.position, horizontalMoveDirection.normalized, Color.green);
         //     #endif
 
         //     // Cast in downward position.
@@ -294,7 +284,7 @@ namespace ExtensibleCharacterController.Characters
         //     #if UNITY_EDITOR
         //     // Draw bottom of capsule cast ray.
         //     Debug.DrawRay(
-        //         ((m_Collider.transform.position + m_DeltaVelocity) + (transform.up * COLLIDER_OFFSET)) + (m_GravityDirection * (m_Collider.height / 2.0f)),
+        //         ((m_Collider.transform.position) + (transform.up * COLLIDER_OFFSET)) + (m_GravityDirection * (m_Collider.height / 2.0f)),
         //         m_GravityDirection * m_SkinWidth,
         //         hitCount > 0 ? Color.red : Color.green
         //     );
@@ -306,7 +296,7 @@ namespace ExtensibleCharacterController.Characters
         //             m_Collider,
         //             hitCount,
         //             m_RaycastHits,
-        //             m_DeltaVelocity,
+        //             transform.up * COLLIDER_OFFSET,
         //             COLLIDER_OFFSET
         //         );
 
@@ -418,7 +408,7 @@ namespace ExtensibleCharacterController.Characters
 
             // Do another cast in the target direction and make sure the final direction is valid.
             // hitCount = NonAllocCapsuleCast(
-            //     (normalizedHorizontalDirection + normalizedTargetDirection) * COLLIDER_OFFSET + m_HorizontalDeltaVelocity,
+            //     (normalizedHorizontalDirection + normalizedTargetDirection) * COLLIDER_OFFSET,
             //     (horizontalMoveDirection + targetDirection).normalized,
             //     ref m_RaycastHits,
             //     m_DebugHorizontalWallCast
@@ -427,7 +417,7 @@ namespace ExtensibleCharacterController.Characters
             float targetDirectionMagnitude = targetDirection.magnitude;
             Vector3 normalizedSlideOffsetDirection = (horizontalMoveDirection + targetDirection).normalized;
             hitCount = NonAllocCapsuleCast(
-                -(normalizedSlideOffsetDirection / 2.0f) + m_HorizontalDeltaVelocity,
+                -(normalizedSlideOffsetDirection / 2.0f),
                 normalizedSlideOffsetDirection,
                 ref m_RaycastHits,
                 m_DebugHorizontalWallCast
@@ -439,12 +429,12 @@ namespace ExtensibleCharacterController.Characters
                 //     m_Collider,
                 //     hitCount,
                 //     m_RaycastHits,
-                //     m_HorizontalDeltaVelocity,
+                //     Vector3.zero,
                 //     COLLIDER_OFFSET
                 // );
                 // hitPoint = horizontalHit.point;
                 // hitNormal = horizontalHit.normal;
-                // colliderPoint = ECCPhysicsHelper.GetClosestColliderPoint(m_Collider, m_HorizontalDeltaVelocity, hitPoint);
+                // colliderPoint = ECCPhysicsHelper.GetClosestColliderPoint(m_Collider, Vector3.zero, hitPoint);
 
                 // distanceFromCollider = (hitPoint - colliderPoint).magnitude - COLLIDER_OFFSET;
                 // if (distanceFromCollider < m_HorizontalSkinWidth)
@@ -582,8 +572,9 @@ namespace ExtensibleCharacterController.Characters
             Vector3 targetDirection = Vector3.zero;
 
             // Cast in downward position.
+            Vector3 verticalOffset = (horizontalMoveDirection.normalized * COLLIDER_OFFSET) + (transform.up * COLLIDER_OFFSET);
             int hitCount = NonAllocCapsuleCast(
-                (horizontalMoveDirection.normalized * COLLIDER_OFFSET) + (transform.up * COLLIDER_OFFSET),
+                verticalOffset,
                 m_GravityDirection * m_SkinWidth,
                 ref m_RaycastHits
             );
@@ -596,7 +587,7 @@ namespace ExtensibleCharacterController.Characters
                     m_Collider,
                     hitCount,
                     m_RaycastHits,
-                    m_VerticalDeltaVelocity,
+                    verticalOffset,
                     COLLIDER_OFFSET
                 );
 
