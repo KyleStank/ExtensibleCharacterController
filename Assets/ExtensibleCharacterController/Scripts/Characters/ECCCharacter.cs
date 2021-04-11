@@ -15,7 +15,11 @@ namespace ExtensibleCharacterController.Characters
     [RequireComponent(typeof(Rigidbody))]
     public class ECCCharacter : ECCBehaviour
     {
+        // Small offset applied to Physics casting and collider position checking. Helps to prevent overlap.
         private const float COLLIDER_OFFSET = 0.01f;
+
+        // Small length that is used for the step over Raycast.
+        private const float STEP_OVER_RAY_LENGTH = 0.1f;
 
         [Header("Generic Settings")]
         [Tooltip("Enable/disable all character functionality, including movement, collisions, gravity, and character behaviours.")]
@@ -46,12 +50,6 @@ namespace ExtensibleCharacterController.Characters
         )]
         [SerializeField]
         private float m_HorizontalSkinWidth = 0.1f;
-        [Tooltip(
-            "The minimum angle that the character must be, relative to a horizontal surface, before surface sliding begins." + " " +
-            "If the angle is 0, the character will slide against every surface. If the angle is 90, the character will never slide against a surface."
-        )]
-        [SerializeField]
-        private float m_HorizontalSurfaceSlideAngleMinimum = 15.0f;
         [Tooltip("Friction multiplier applied to surface sliding.")]
         [SerializeField]
         private float m_HorizontalFrictionFactor = 1.0f;
@@ -81,6 +79,12 @@ namespace ExtensibleCharacterController.Characters
         [Tooltip("Visually indicates the horizontal collision test that happens when sliding on a surface. Drawn in the Editor and at Runtime.")]
         [SerializeField]
         private bool m_DebugHorizontalWallCast = false;
+        [Tooltip("Draws the move direction at the character's position.")]
+        [SerializeField]
+        private bool m_DebugMoveDirection = false;
+        [Tooltip("Draws the normalized move direction at the character's position.")]
+        [SerializeField]
+        private bool m_DebugNormalizedMoveDirection = false;
 
         [Header("Behaviours")]
         [SerializeField]
@@ -208,9 +212,9 @@ namespace ExtensibleCharacterController.Characters
         private void FixedUpdate()
         {
             // TODO: Move elsewhere when ready.
-            Vector3 eulerRot = transform.rotation.eulerAngles;
+            Vector3 eulerRot = m_Rigidbody.rotation.eulerAngles;
             eulerRot.y = Camera.main.transform.eulerAngles.y;
-            transform.rotation = Quaternion.Euler(eulerRot);
+            m_Rigidbody.rotation = Quaternion.Euler(eulerRot);
 
             // Set gravity direction every frame to account for rotation changes.
             m_GravityDirection = -transform.up;
@@ -228,93 +232,112 @@ namespace ExtensibleCharacterController.Characters
 
             #if UNITY_EDITOR
             // Draw final movement direction.
-            Debug.DrawRay(transform.position + m_DeltaVelocity, m_MoveDirection, Color.magenta);
+            if (m_DebugMoveDirection)
+            {
+                DebugExtension.DebugArrow(
+                    m_Rigidbody.position + m_DeltaVelocity,
+                    m_DebugNormalizedMoveDirection ? m_MoveDirection.normalized : m_MoveDirection,
+                    Color.magenta
+                );
+            }
             #endif
 
             // Move character after all calculations are completed.
             // Make sure move direction is multiplied by delta time as the direction vector is too large for per-frame movement.
             if (m_MotorEnabled)
             {
-                transform.position += m_MoveDirection;
-                // m_Rigidbody.MovePosition(m_Rigidbody.position + m_MoveDirection);
+                m_Rigidbody.MovePosition(m_Rigidbody.position + m_MoveDirection);
             }
 
-            // m_DeltaVelocity = m_Rigidbody.velocity * Time.fixedDeltaTime;
-            // m_HorizontalDeltaVelocity = Vector3.ProjectOnPlane(m_DeltaVelocity, transform.up);
-            // m_VerticalDeltaVelocity = Vector3.ProjectOnPlane(
-            //     Vector3.ProjectOnPlane(m_DeltaVelocity, transform.forward),
-            //     transform.right
-            // );
+            m_DeltaVelocity = m_Rigidbody.velocity * Time.fixedDeltaTime;
+            m_HorizontalDeltaVelocity = Vector3.ProjectOnPlane(m_DeltaVelocity, transform.up);
+            m_VerticalDeltaVelocity = Vector3.ProjectOnPlane(
+                Vector3.ProjectOnPlane(m_DeltaVelocity, transform.forward),
+                transform.right
+            );
             m_MoveDirection = Vector3.zero;
         }
 
-        // TODO: https://app.asana.com/0/1200147678177766/1200147678177803
-        private void SmoothMoveDirection()
-        {
-            Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MoveDirection, -m_GravityDirection);
-            if (!IsMovingHorizontal(horizontalMoveDirection)) return;
+        #region Smooth Move Direction
 
-            #if UNITY_EDITOR
-            // Draw horizontal direction.
-            Debug.DrawRay(transform.position + m_DeltaVelocity, horizontalMoveDirection.normalized, Color.green);
-            #endif
+        // // TODO: https://app.asana.com/0/1200147678177766/1200147678177803
+        // private void SmoothMoveDirection()
+        // {
+        //     Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MoveDirection, -m_GravityDirection);
+        //     if (!IsMovingHorizontal(horizontalMoveDirection)) return;
 
-            // Cast in downward position.
-            int hitCount = NonAllocCapsuleCast(
-                transform.up * COLLIDER_OFFSET,
-                m_GravityDirection * m_SkinWidth,
-                ref m_RaycastHits
-            );
+        //     #if UNITY_EDITOR
+        //     // Draw horizontal direction.
+        //     Debug.DrawRay(transform.position + m_DeltaVelocity, horizontalMoveDirection.normalized, Color.green);
+        //     #endif
 
-            #if UNITY_EDITOR
-            // Draw bottom of capsule cast ray.
-            Debug.DrawRay(
-                ((m_Collider.transform.position + m_DeltaVelocity) + (transform.up * COLLIDER_OFFSET)) + (m_GravityDirection * (m_Collider.height / 2.0f)),
-                m_GravityDirection * m_SkinWidth,
-                hitCount > 0 ? Color.red : Color.green
-            );
-            #endif
+        //     // Cast in downward position.
+        //     int hitCount = NonAllocCapsuleCast(
+        //         transform.up * COLLIDER_OFFSET,
+        //         m_GravityDirection * m_SkinWidth,
+        //         ref m_RaycastHits
+        //     );
 
-            if (hitCount > 0)
-            {
-                RaycastHit hit = ECCPhysicsHelper.GetClosestRaycastHitRecursive(
-                    m_Collider,
-                    hitCount,
-                    m_RaycastHits,
-                    m_DeltaVelocity,
-                    COLLIDER_OFFSET
-                );
+        //     #if UNITY_EDITOR
+        //     // Draw bottom of capsule cast ray.
+        //     Debug.DrawRay(
+        //         ((m_Collider.transform.position + m_DeltaVelocity) + (transform.up * COLLIDER_OFFSET)) + (m_GravityDirection * (m_Collider.height / 2.0f)),
+        //         m_GravityDirection * m_SkinWidth,
+        //         hitCount > 0 ? Color.red : Color.green
+        //     );
+        //     #endif
 
-                m_MoveDirection += CreateSlopeDirection(horizontalMoveDirection, hit.normal);
-            }
+        //     if (hitCount > 0)
+        //     {
+        //         RaycastHit hit = ECCPhysicsHelper.GetClosestRaycastHitRecursive(
+        //             m_Collider,
+        //             hitCount,
+        //             m_RaycastHits,
+        //             m_DeltaVelocity,
+        //             COLLIDER_OFFSET
+        //         );
 
-            ClearRaycasts();
-        }
+        //         m_MoveDirection += CreateSlopeDirection(horizontalMoveDirection, hit.normal);
+        //     }
 
-        private bool IsMovingHorizontal(Vector3 horizontalMoveDirection)
-        {
-            return horizontalMoveDirection.magnitude >= 0.001f;
-        }
+        //     ClearRaycasts();
+        // }
 
-        // Creates a direction based a sloped surface. If no slope is detected, returns provided direction.
-        // Only works for ground surfaces.
-        private Vector3 CreateSlopeDirection(Vector3 horizontalMoveDirection, Vector3 hitNormal)
-        {
-            if (!IsWalkableNormal(hitNormal)) return Vector3.zero;
+        // private bool IsMovingHorizontal(Vector3 horizontalMoveDirection)
+        // {
+        //     return horizontalMoveDirection.magnitude >= 0.001f;
+        // }
 
-            // Creates an up direction normal based on the hit normal and the right direction.
-            // Using the right direction affects the upNormal by rotation, which is useful for the forward direction below.
-            Vector3 upNormal = Vector3.ProjectOnPlane(hitNormal, transform.right).normalized;
+        // // Creates a direction based a sloped surface. If no slope is detected, returns provided direction.
+        // // Only works for ground surfaces.
+        // private Vector3 CreateSlopeDirection(Vector3 horizontalMoveDirection, Vector3 hitNormal)
+        // {
+        //     if (!IsWalkableNormal(hitNormal)) return Vector3.zero;
 
-            // Invert because the default value is a backwards direction.
-            // Direction is created by crossing an up direction (hitNormal) and a right direction to get a forward direction.
-            Vector3 forwardDirection = -Vector3.Cross(
-                hitNormal,
-                Vector3.Cross(upNormal, horizontalMoveDirection) // Creates a right direction based on rotation and horizontal move direction.
-            ).normalized * horizontalMoveDirection.magnitude;
+        //     // Creates an up direction normal based on the hit normal and the right direction.
+        //     // Using the right direction affects the upNormal by rotation, which is useful for the forward direction below.
+        //     Vector3 upNormal = Vector3.ProjectOnPlane(hitNormal, transform.right).normalized;
 
-            return forwardDirection - horizontalMoveDirection;
-        }
+        //     // Invert because the default value is a backwards direction.
+        //     // Direction is created by crossing an up direction (hitNormal) and a right direction to get a forward direction.
+        //     Vector3 forwardDirection = -Vector3.Cross(
+        //         hitNormal,
+        //         Vector3.Cross(upNormal, horizontalMoveDirection) // Creates a right direction based on rotation and horizontal move direction.
+        //     ).normalized * horizontalMoveDirection.magnitude;
+
+        //     return forwardDirection - horizontalMoveDirection;
+        // }
+
+        // private bool IsWalkableNormal(Vector3 normal)
+        // {
+        //     // Calculate angle of slope based on normal.
+        //     float angle = Vector3.Angle(normal, transform.up);
+        //     return angle < m_MaxSlopeAngle;
+        // }
+
+        #endregion
+
+        #region Horizontal Collision Detection
 
         // TODO: https://app.asana.com/0/1200147678177766/1200147678177805
         private void DetectHorizontalCollisions()
@@ -332,7 +355,7 @@ namespace ExtensibleCharacterController.Characters
             }
 
             // Perform capsule cast in horizontal direction.
-            Vector3 horizontalOffset = -(normalizedHorizontalDirection / 2.0f) + m_HorizontalDeltaVelocity;
+            // Vector3 horizontalOffset = -(normalizedHorizontalDirection / 2.0f) + m_HorizontalDeltaVelocity;
             int hitCount = NonAllocCapsuleCast(
                 horizontalMoveDirection,
                 horizontalMoveDirection,
@@ -350,62 +373,46 @@ namespace ExtensibleCharacterController.Characters
                     COLLIDER_OFFSET
                 );
                 Vector3 hitPoint = horizontalHit.point;
-                Vector3 hitNormal = horizontalHit.normal;
-                Vector3 colliderPoint = ECCPhysicsHelper.GetClosestColliderPoint(m_Collider, horizontalMoveDirection, hitPoint);
 
-                float colliderDistance = (hitPoint - colliderPoint).magnitude - COLLIDER_OFFSET;
-                if (horizontalHit.distance - COLLIDER_OFFSET <= m_HorizontalSkinWidth)
+                // Check if character can step over.
+                Vector3 localHitPoint = transform.InverseTransformPoint(hitPoint);
+                if (localHitPoint.y <= m_MaxStep + COLLIDER_OFFSET)
                 {
-                    // // TODO: Test this to ensure it still works.
-                    // // Check if character can step over.
-                    // Vector3 localHitPoint = transform.InverseTransformPoint(hitPoint);
-                    // if (localHitPoint.y <= m_MaxStep + COLLIDER_OFFSET)
-                    // {
-                    //     // If character can step over, do not continue.
-                    //     // Prevents horizontal collision correction from running while on a slope.
-                    //     Physics.Raycast(
-                    //         hitPoint - horizontalOffset,
-                    //         horizontalMoveDirection,
-                    //         out m_SingleRaycastHit,
-                    //         m_HorizontalSkinWidth,
-                    //         ~m_CollisionIgnoreLayer.value
-                    //     );
-                    //     float slopeAngle = Vector3.Angle(transform.up, m_SingleRaycastHit.normal);
-                    //     if (slopeAngle <= m_MaxSlopeAngle + COLLIDER_OFFSET) return;
-                    // }
+                    // If character can step over, do not continue.
+                    // Prevents horizontal collision detection from running while on a slope.
+                    Physics.Raycast(
+                        hitPoint - (horizontalMoveDirection * COLLIDER_OFFSET),
+                        normalizedHorizontalDirection,
+                        out m_SingleRaycastHit,
+                        STEP_OVER_RAY_LENGTH,
+                        ~m_CollisionIgnoreLayer.value
+                    );
 
-                    // // Find actual distance from skin width. Then apply the difference. Allows character to get as close to surface as possible.
-                    // Vector3 correctionDirection = Vector3.zero;
-                    // float correctionDistance = m_HorizontalSkinWidth - distanceFromCollider;
-                    // if (correctionDistance < m_HorizontalSkinWidth)
-                    // {
-                    //     correctionDirection +=
-                    //         normalizedHorizontalDirection * horizontalDirectionMagnitude
-                    //         * ((m_HorizontalSkinWidth - distanceFromCollider) * Time.fixedDeltaTime * horizontalDirectionMagnitude);
-                    // }
-
-                    // Create direction that allows character to slide off surfaces by projecting the horizontal direction onto the hit surface.
-                    // Uses same magnitude as horizontal direction, so make sure to remove horizontal direction before applying target direction.
-                    Vector3 horizontalNormal = Vector3.ProjectOnPlane(hitNormal, transform.up);
-                    Vector3 surfaceDirection = Vector3.ProjectOnPlane(horizontalMoveDirection, horizontalNormal).normalized;
-
-                    float surfaceAngle = 90.0f - Vector3.Angle(horizontalMoveDirection, surfaceDirection);
-                    if (surfaceAngle >= m_HorizontalSurfaceSlideAngleMinimum)
-                    {
-                        // Calculate the strength of the surface direction based on the direction of the horizontal move direction.
-                        // The Dot product of the normalized horizontal direction and inverse horizontal normal is perfect, as it uses cosine.
-                        float surfaceDirectionStrength = 1.0f - Vector3.Dot(normalizedHorizontalDirection, -horizontalNormal);
-
-                        // If the horizontal magnitude is greater than the radius of the collider, than the collider point distance will be used.
-                        // This will prevent overlap. Collisions behave odd if an object moves more than its radius and has another collision next frame.
-                        float surfaceDirectionDistance = Mathf.Min(horizontalHit.distance - COLLIDER_OFFSET, horizontalDirectionMagnitude);
-
-                        // Calculate the surface move direction by multiplying the surface direction by all of our factor values.
-                        targetDirection = surfaceDirection * (surfaceDirectionDistance * surfaceDirectionStrength) * m_HorizontalFrictionFactor;
-                    }
-
-                    ClearRaycasts();
+                    float slopeAngle = Vector3.Angle(transform.up, m_SingleRaycastHit.normal);
+                    if (slopeAngle <= m_MaxSlopeAngle + COLLIDER_OFFSET) return;
                 }
+
+                // Calculate the distance from the closest collider point to the raycast hit point.
+                Vector3 colliderPoint = ECCPhysicsHelper.GetClosestColliderPoint(m_Collider, horizontalMoveDirection, hitPoint);
+                float colliderDistance = (hitPoint - colliderPoint).magnitude - COLLIDER_OFFSET;
+
+                // Create direction that allows character to slide off surfaces by projecting the horizontal direction onto the hit surface.
+                // Uses same magnitude as horizontal direction, so make sure to remove horizontal direction before applying target direction.
+                Vector3 horizontalNormal = Vector3.ProjectOnPlane(horizontalHit.normal, transform.up);
+                Vector3 surfaceDirection = Vector3.ProjectOnPlane(horizontalMoveDirection, horizontalNormal).normalized;
+
+                // Calculate the strength of the surface direction based on the direction of the horizontal move direction.
+                // The Dot product of the normalized horizontal direction and inverse horizontal normal is perfect, as it uses cosine.
+                float surfaceDirectionStrength = 1.0f - Vector3.Dot(normalizedHorizontalDirection, -horizontalNormal);
+
+                // If the horizontal magnitude is greater than the radius of the collider, than the collider distance will be used.
+                // This will prevent overlap. Collisions behave odd if an object moves more than its radius and has another collision next frame.
+                float surfaceDirectionDistance = Mathf.Min(colliderDistance, horizontalDirectionMagnitude);
+
+                // Calculate the surface move direction by multiplying the surface direction by all of our factor values.
+                targetDirection = surfaceDirection * (horizontalDirectionMagnitude - surfaceDirectionDistance) * surfaceDirectionStrength * m_HorizontalFrictionFactor;
+
+                ClearRaycasts();
             }
 
             // Do another cast in the target direction to make sure direction is correct.
@@ -494,6 +501,10 @@ namespace ExtensibleCharacterController.Characters
 
             m_MoveDirection = targetDirection;
         }
+
+        #endregion
+
+        #region Vertical Collision Detection
 
         // TODO: https://app.asana.com/0/1200147678177766/1200147678177807
         private void DetectVerticalCollisions()
@@ -585,12 +596,9 @@ namespace ExtensibleCharacterController.Characters
             m_MoveDirection += targetDirection;
         }
 
-        private bool IsWalkableNormal(Vector3 normal)
-        {
-            // Calculate angle of slope based on normal.
-            float angle = Vector3.Angle(normal, transform.up);
-            return angle < m_MaxSlopeAngle;
-        }
+        #endregion
+
+        #region Collision Helpers
 
         private bool IsOverlapping(Collider collider, Vector3 offset, out Vector3 direction, out float distance)
         {
@@ -674,6 +682,8 @@ namespace ExtensibleCharacterController.Characters
                 m_RaycastHits[i] = default(RaycastHit);
             }
         }
+
+        #endregion
 
         #if UNITY_EDITOR
         private void OnDrawGizmos()
