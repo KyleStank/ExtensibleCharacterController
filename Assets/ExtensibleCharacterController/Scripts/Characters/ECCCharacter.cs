@@ -18,8 +18,8 @@ namespace ExtensibleCharacterController.Characters
         // Small offset applied to Physics casting and collider position checking. Helps to prevent overlap.
         private const float COLLIDER_OFFSET = 0.01f;
 
-        // Small length that is used for the step over Raycast.
-        private const float STEP_OVER_RAY_LENGTH = 0.1f;
+        // Small offset that is used in a raycast when checking if character should step over an object.
+        private const float STEP_CHECK_OFFSET = 0.1f;
 
         [Header("Generic Settings")]
         [Tooltip("Enable/disable all character functionality, including movement, collisions, gravity, and character behaviours.")]
@@ -68,6 +68,14 @@ namespace ExtensibleCharacterController.Characters
         [Tooltip("The maximum slope angle that the character can move over.")]
         [SerializeField]
         private float m_MaxSlopeAngle = 60.0f;
+        [Tooltip(
+            "The amount of leeway that is allowed when checking slope angles." + " " +
+            "This means the angle of sloped objects does not have be 100% exactly equal to the max slope angle." + " " +
+            "For example, if the maximum slope angle is 60 and the slope leeway angle is 0.5," + " " +
+            "then a sloped object with an angle of 60.5 and under will be walkable."
+        )]
+        [SerializeField]
+        private float m_SlopeLeewayAngle = 0.5f;
 
         [Header("Debug Settings")]
         [Tooltip("Change the global time scale. Useful for slowly visualizing changes to a fast character.")]
@@ -79,6 +87,9 @@ namespace ExtensibleCharacterController.Characters
         [Tooltip("Visually indicates the horizontal collision test that happens when sliding on a surface. Drawn in the Editor and at Runtime.")]
         [SerializeField]
         private bool m_DebugHorizontalWallCast = false;
+        [Tooltip("Draws the casts/overlap checks that occur when checking for steps/slopes during horizontal collision detection.")]
+        [SerializeField]
+        private bool m_DebugHorizontalStepCast = false;
         [Tooltip("Draws the move direction at the character's position.")]
         [SerializeField]
         private bool m_DebugMoveDirection = false;
@@ -196,6 +207,7 @@ namespace ExtensibleCharacterController.Characters
             m_Rigidbody.useGravity = false;
             m_Rigidbody.isKinematic = true;
             m_Rigidbody.constraints = RigidbodyConstraints.None;
+            m_Rigidbody.interpolation = RigidbodyInterpolation.None;
         }
 
         private void Update()
@@ -212,9 +224,9 @@ namespace ExtensibleCharacterController.Characters
         private void FixedUpdate()
         {
             // TODO: Move elsewhere when ready.
-            Vector3 eulerRot = m_Rigidbody.rotation.eulerAngles;
+            Vector3 eulerRot = transform.rotation.eulerAngles;
             eulerRot.y = Camera.main.transform.eulerAngles.y;
-            m_Rigidbody.rotation = Quaternion.Euler(eulerRot);
+            transform.rotation = Quaternion.Euler(eulerRot);
 
             // Set gravity direction every frame to account for rotation changes.
             m_GravityDirection = -transform.up;
@@ -230,31 +242,32 @@ namespace ExtensibleCharacterController.Characters
             DetectHorizontalCollisions();
             // DetectVerticalCollisions();
 
+            // Move character after all calculations are completed.
+            // Make sure move direction is multiplied by delta time as the direction vector is too large for per-frame movement.
+            if (m_MotorEnabled)
+            {
+                transform.position += m_MoveDirection;
+                // m_Rigidbody.MovePosition(m_Rigidbody.position + m_MoveDirection);
+            }
+
             #if UNITY_EDITOR
             // Draw final movement direction.
             if (m_DebugMoveDirection)
             {
                 DebugExtension.DebugArrow(
-                    m_Rigidbody.position + m_DeltaVelocity,
+                    m_Rigidbody.position,
                     m_DebugNormalizedMoveDirection ? m_MoveDirection.normalized : m_MoveDirection,
                     Color.magenta
                 );
             }
             #endif
 
-            // Move character after all calculations are completed.
-            // Make sure move direction is multiplied by delta time as the direction vector is too large for per-frame movement.
-            if (m_MotorEnabled)
-            {
-                m_Rigidbody.MovePosition(m_Rigidbody.position + m_MoveDirection);
-            }
-
-            m_DeltaVelocity = m_Rigidbody.velocity * Time.fixedDeltaTime;
-            m_HorizontalDeltaVelocity = Vector3.ProjectOnPlane(m_DeltaVelocity, transform.up);
-            m_VerticalDeltaVelocity = Vector3.ProjectOnPlane(
-                Vector3.ProjectOnPlane(m_DeltaVelocity, transform.forward),
-                transform.right
-            );
+            // m_DeltaVelocity = m_Rigidbody.velocity * Time.fixedDeltaTime;
+            // m_HorizontalDeltaVelocity = Vector3.ProjectOnPlane(m_DeltaVelocity, transform.up);
+            // m_VerticalDeltaVelocity = Vector3.ProjectOnPlane(
+            //     Vector3.ProjectOnPlane(m_DeltaVelocity, transform.forward),
+            //     transform.right
+            // );
             m_MoveDirection = Vector3.zero;
         }
 
@@ -332,7 +345,7 @@ namespace ExtensibleCharacterController.Characters
         // {
         //     // Calculate angle of slope based on normal.
         //     float angle = Vector3.Angle(normal, transform.up);
-        //     return angle < m_MaxSlopeAngle;
+        //     return angle < m_MaxSlopeAngle + m_SlopeLeewayAngle;
         // }
 
         #endregion
@@ -342,10 +355,11 @@ namespace ExtensibleCharacterController.Characters
         // TODO: https://app.asana.com/0/1200147678177766/1200147678177805
         private void DetectHorizontalCollisions()
         {
-            // float horizontalOffset = 0.05f;
+            // Turn move direction into horizontal direction only.
             Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MoveDirection, transform.up);
             Vector3 targetDirection = horizontalMoveDirection;
 
+            // If no movement is occuring, no need to check for collisions.
             Vector3 normalizedHorizontalDirection = horizontalMoveDirection.normalized;
             float horizontalDirectionMagnitude = horizontalMoveDirection.magnitude;
             if (horizontalDirectionMagnitude <= 0.001f)
@@ -354,8 +368,10 @@ namespace ExtensibleCharacterController.Characters
                 return;
             }
 
-            // Perform capsule cast in horizontal direction.
-            // Vector3 horizontalOffset = -(normalizedHorizontalDirection / 2.0f) + m_HorizontalDeltaVelocity;
+            // Store the capsule radius for future use below.
+            float radius = m_Collider.radius * ECCPhysicsHelper.GetCapsuleRadiusScale(m_Collider);
+
+            // Check for collisions in the horizontal direction.
             int hitCount = NonAllocCapsuleCast(
                 horizontalMoveDirection,
                 horizontalMoveDirection,
@@ -374,27 +390,9 @@ namespace ExtensibleCharacterController.Characters
                 );
                 Vector3 hitPoint = horizontalHit.point;
 
-                // Check if character can step over.
-                Vector3 localHitPoint = transform.InverseTransformPoint(hitPoint);
-                if (localHitPoint.y <= m_MaxStep + COLLIDER_OFFSET)
-                {
-                    // If character can step over, do not continue.
-                    // Prevents horizontal collision detection from running while on a slope.
-                    Physics.Raycast(
-                        hitPoint - (horizontalMoveDirection * COLLIDER_OFFSET),
-                        normalizedHorizontalDirection,
-                        out m_SingleRaycastHit,
-                        STEP_OVER_RAY_LENGTH,
-                        ~m_CollisionIgnoreLayer.value
-                    );
-
-                    float slopeAngle = Vector3.Angle(transform.up, m_SingleRaycastHit.normal);
-                    if (slopeAngle <= m_MaxSlopeAngle + COLLIDER_OFFSET) return;
-                }
-
-                // Calculate the distance from the closest collider point to the raycast hit point.
-                Vector3 colliderPoint = ECCPhysicsHelper.GetClosestColliderPoint(m_Collider, horizontalMoveDirection, hitPoint);
-                float colliderDistance = (hitPoint - colliderPoint).magnitude - COLLIDER_OFFSET;
+                // If the hit point can be stepped over, do not continue. Vertical collision detection will handle the actual step-up logic.
+                bool canStepOver = CanStepOver(hitPoint, horizontalMoveDirection, normalizedHorizontalDirection, horizontalDirectionMagnitude);
+                if (canStepOver) return;
 
                 // Create direction that allows character to slide off surfaces by projecting the horizontal direction onto the hit surface.
                 // Uses same magnitude as horizontal direction, so make sure to remove horizontal direction before applying target direction.
@@ -407,15 +405,18 @@ namespace ExtensibleCharacterController.Characters
 
                 // If the horizontal magnitude is greater than the radius of the collider, than the collider distance will be used.
                 // This will prevent overlap. Collisions behave odd if an object moves more than its radius and has another collision next frame.
+                Vector3 colliderPoint = ECCPhysicsHelper.GetClosestColliderPoint(m_Collider, horizontalMoveDirection, hitPoint);
+                float colliderDistance = (hitPoint - colliderPoint).magnitude - COLLIDER_OFFSET;
                 float surfaceDirectionDistance = Mathf.Min(colliderDistance, horizontalDirectionMagnitude);
 
-                // Calculate the surface move direction by multiplying the surface direction by all of our factor values.
-                targetDirection = surfaceDirection * (horizontalDirectionMagnitude - surfaceDirectionDistance) * surfaceDirectionStrength * m_HorizontalFrictionFactor;
+                // Calculate the target move direction by multiplying the surface direction by all of our factor values.
+                targetDirection = surfaceDirection *
+                    (horizontalDirectionMagnitude - surfaceDirectionDistance) * surfaceDirectionStrength * m_HorizontalFrictionFactor;
 
                 ClearRaycasts();
             }
 
-            // Do another cast in the target direction to make sure direction is correct.
+            // Do another cast in the target direction and make sure the final direction is valid.
             // hitCount = NonAllocCapsuleCast(
             //     (normalizedHorizontalDirection + normalizedTargetDirection) * COLLIDER_OFFSET + m_HorizontalDeltaVelocity,
             //     (horizontalMoveDirection + targetDirection).normalized,
@@ -470,8 +471,8 @@ namespace ExtensibleCharacterController.Characters
                 //     //     {
                 //     //         Debug.Break();
                 //     //     }
-                //     //     // float slopeAngle = Vector3.Angle(transform.up, m_SingleRaycastHit.normal);
-                //     //     // if (slopeAngle <= m_MaxSlopeAngle + COLLIDER_OFFSET) return;
+                //     //     // float slopeAngle = Vector3.Angle(m_SingleRaycastHit.normal, transform.up);
+                //     //     // if (slopeAngle <= m_MaxSlopeAngle + m_SlopeLeewayAngle) return;
                 //     // }
 
                 //     // // Find actual distance from skin width. Then apply the difference. Allows character to get as close to surface as possible.
@@ -500,6 +501,73 @@ namespace ExtensibleCharacterController.Characters
             }
 
             m_MoveDirection = targetDirection;
+        }
+
+        // Returns true if the character can step over a point. Otherwise, returns false.
+        private bool CanStepOver(Vector3 point, Vector3 horizontalMoveDirection, Vector3 castDirection, float? horizontalMagnitude = null)
+        {
+            // The passed in directions must be a horizontal direction.
+            if (horizontalMoveDirection.y != 0.0f)
+            {
+                Debug.Log("Convert Horizontal Move Direction.");
+                horizontalMoveDirection = Vector3.ProjectOnPlane(horizontalMoveDirection, transform.up);
+            }
+
+            if (castDirection.y != 0.0f)
+            {
+                Debug.Log("Convert Cast Direction.");
+                castDirection = Vector3.ProjectOnPlane(castDirection, transform.up);
+            }
+
+            // Make sure the horizontal magnitude is not null.
+            horizontalMagnitude = horizontalMagnitude != null ? horizontalMagnitude : horizontalMoveDirection.magnitude;
+
+            // Check if character can step over. This can only happen if the hit point is less than the maximum step height.
+            Vector3 localPoint = transform.InverseTransformPoint(point);
+            if (localPoint.y <= m_MaxStep + COLLIDER_OFFSET)
+            {
+                // Do a raycast that is slightly offset from the hit point.
+                // This will get the true normal, whichs allow us to check the true angle of the point.
+                Vector3 slopeCheckOrigin = point - (horizontalMoveDirection * COLLIDER_OFFSET);
+                SimpleRaycast(
+                    slopeCheckOrigin,
+                    castDirection,
+                    out m_SingleRaycastHit,
+                    STEP_CHECK_OFFSET
+                );
+
+                // If the hit angle is less than the maximum slope angle, then we can step over.
+                float slopeAngle = Vector3.Angle(m_SingleRaycastHit.normal, transform.up);
+                if (slopeAngle <= m_MaxSlopeAngle + m_SlopeLeewayAngle) return true;
+
+                // Do another capsule cast that is vertically offset by the step height and check for slope one last time.
+                if (SimpleCapsuleCast(
+                    horizontalMoveDirection + (transform.up * m_MaxStep),
+                    horizontalMoveDirection,
+                    out m_SingleRaycastHit,
+                    m_DebugHorizontalStepCast
+                ))
+                {
+                    // Make sure distance is within magnitude of move direction. Otherwise, next frame or two can handle this.
+                    if (m_SingleRaycastHit.distance - COLLIDER_OFFSET < (float)horizontalMagnitude)
+                    {
+                        SimpleRaycast(
+                            slopeCheckOrigin,
+                            castDirection,
+                            out m_SingleRaycastHit,
+                            STEP_CHECK_OFFSET
+                        );
+
+                        slopeAngle = Vector3.Angle(m_SingleRaycastHit.normal, transform.up);
+                        if (slopeAngle <= m_MaxSlopeAngle + m_SlopeLeewayAngle) return true;
+                    }
+                }
+
+                // If we have gotten this far, we can step over because than the point is not on a slope and is simply lower than the step height.
+                return true;
+            }
+
+            return false;
         }
 
         #endregion
@@ -533,8 +601,8 @@ namespace ExtensibleCharacterController.Characters
                 );
 
                 // If slope is too high, do not continue.
-                float slopeAngle = Vector3.Angle(transform.up, hit.normal);
-                if (slopeAngle >= m_MaxSlopeAngle + COLLIDER_OFFSET) return;
+                float slopeAngle = Vector3.Angle(hit.normal, transform.up);
+                if (slopeAngle >= m_MaxSlopeAngle + m_SlopeLeewayAngle) return;
 
                 // Vector3 hitPoint = hit.point + (hit.normal * COLLIDER_OFFSET);
                 Vector3 hitPoint = hit.point + (hit.normal * COLLIDER_OFFSET);
@@ -567,8 +635,8 @@ namespace ExtensibleCharacterController.Characters
                         m_HorizontalSkinWidth,
                         ~m_CollisionIgnoreLayer.value
                     );
-                    float angle = Vector3.Angle(transform.up, m_SingleRaycastHit.normal);
-                    if (slopeAngle <= m_MaxSlopeAngle + COLLIDER_OFFSET)
+                    float angle = Vector3.Angle(m_SingleRaycastHit.normal, transform.up);
+                    if (slopeAngle <= m_MaxSlopeAngle + m_SlopeLeewayAngle)
                     {
                         targetDirection.y = 0.0f;
                     }
@@ -623,6 +691,24 @@ namespace ExtensibleCharacterController.Characters
 
             return overlapped;
         }
+
+        // Peforms a raycast that returns true when any one collider is hit; otherwise, returns false.
+        private bool SimpleRaycast(Vector3 origin, Vector3 direction, out RaycastHit raycastHit, float distance, bool debugDraw = false)
+        {
+            return Physics.Raycast(
+                origin,
+                direction,
+                out raycastHit,
+                distance,
+                ~m_CollisionIgnoreLayer.value,
+                debugDraw ? PreviewCondition.Both : PreviewCondition.None,
+                0.0f,
+                Color.red,
+                Color.green
+            );
+        }
+
+        // Performs a capsule cast that can hit multiple colliders. Returns the number of items hit and stores the raycast hits in an array.
         private int NonAllocCapsuleCast(Vector3 offset, Vector3 direction, ref RaycastHit[] hits, bool debugDraw = false)
         {
             float radiusMultiplier = ECCPhysicsHelper.GetCapsuleRadiusScale(m_Collider);
@@ -650,6 +736,35 @@ namespace ExtensibleCharacterController.Characters
             );
         }
 
+        // Performs a capsule cast that returns true when any one collider is hit; otherwise, returns false.
+        private bool SimpleCapsuleCast(Vector3 offset, Vector3 direction, out RaycastHit raycastHit, bool debugDraw = false)
+        {
+            float radiusMultiplier = ECCPhysicsHelper.GetCapsuleRadiusScale(m_Collider);
+            float radius = (m_Collider.radius * radiusMultiplier) + COLLIDER_OFFSET;
+            ECCPhysicsHelper.CalculateCapsuleCaps(
+                m_Collider,
+                m_Collider.transform.position + offset,
+                m_Collider.transform.rotation,
+                out Vector3 capStart,
+                out Vector3 capEnd
+            );
+
+            return Physics.CapsuleCast(
+                capStart,
+                capEnd,
+                radius,
+                direction.normalized,
+                out raycastHit,
+                direction.magnitude,
+                ~m_CollisionIgnoreLayer.value,
+                debugDraw ? PreviewCondition.Both : PreviewCondition.None,
+                0.0f,
+                Color.red,
+                Color.green
+            );
+        }
+
+        // Performs a capsule overlap. Returns the number of items overlapping and stores the overlapped colliders in an array.
         private int NonAllocCapsuleOverlap(Vector3 offset, ref Collider[] colliders, bool debugDraw = false)
         {
             float radiusMultiplier = ECCPhysicsHelper.GetCapsuleRadiusScale(m_Collider);
