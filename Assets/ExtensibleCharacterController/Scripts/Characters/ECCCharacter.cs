@@ -456,34 +456,31 @@ namespace ExtensibleCharacterController.Characters
             }
 
             // Do another cast in the target direction and make sure the final direction is valid.
-            // hitCount = NonAllocCapsuleCast(
-            //     (normalizedHorizontalDirection + normalizedTargetDirection) * COLLIDER_OFFSET,
-            //     (horizontalMoveDirection + targetDirection).normalized,
-            //     ref m_RaycastHits,
-            //     m_DebugHorizontalWallCast
-            // );
             Vector3 normalizedTargetDirection = targetDirection.normalized;
             float targetDirectionMagnitude = targetDirection.magnitude;
-            Vector3 normalizedSlideOffsetDirection = (horizontalMoveDirection + targetDirection).normalized;
             hitCount = NonAllocCapsuleCast(
-                -(normalizedSlideOffsetDirection / 2.0f),
-                normalizedSlideOffsetDirection,
+                targetDirection,
+                targetDirection,
                 ref m_RaycastHits,
                 m_DebugHorizontalWallCast
             );
 
             if (hitCount > 0)
             {
-                // horizontalHit = ECCPhysicsHelper.GetClosestRaycastHitRecursive(
-                //     m_Collider,
-                //     hitCount,
-                //     m_RaycastHits,
-                //     Vector3.zero,
-                //     COLLIDER_OFFSET
-                // );
-                // hitPoint = horizontalHit.point;
-                // hitNormal = horizontalHit.normal;
-                // colliderPoint = ECCPhysicsHelper.GetClosestColliderPoint(m_Collider, Vector3.zero, hitPoint);
+                RaycastHit horizontalHit = ECCPhysicsHelper.GetClosestRaycastHitRecursive(
+                    m_Collider,
+                    hitCount,
+                    m_RaycastHits,
+                    horizontalMoveDirection,
+                    COLLIDER_OFFSET
+                );
+                Vector3 hitPoint = horizontalHit.point;
+
+                // If the hit point can be stepped over, do not continue. Vertical collision detection will handle the actual step-up logic.
+                bool canStepOver = CanStepOver(hitPoint, targetDirection, normalizedTargetDirection, targetDirectionMagnitude);
+                Debug.Log("Can Step Over? " + canStepOver);
+                // m_CanValidateHorizontalDirection = !canStepOver; // If a step over happened, ignore horizontal validation this frame.
+                // ClearOverlapColliders();
 
                 // distanceFromCollider = (hitPoint - colliderPoint).magnitude - COLLIDER_OFFSET;
                 // if (distanceFromCollider < m_HorizontalSkinWidth)

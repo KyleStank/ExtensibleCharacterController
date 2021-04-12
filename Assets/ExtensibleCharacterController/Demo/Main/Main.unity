@@ -16326,6 +16326,26 @@ PrefabInstance:
   m_Modification:
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 279154574, guid: 1952abc1557af4b44bc45626c631c10b, type: 3}
+      propertyPath: m_MaxStep
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 279154574, guid: 1952abc1557af4b44bc45626c631c10b, type: 3}
+      propertyPath: m_FixCollisionOverlaps
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 279154574, guid: 1952abc1557af4b44bc45626c631c10b, type: 3}
+      propertyPath: m_DebugHorizontalWallCast
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 279154574, guid: 1952abc1557af4b44bc45626c631c10b, type: 3}
+      propertyPath: m_VerticalCollisionsEnabled
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 279154574, guid: 1952abc1557af4b44bc45626c631c10b, type: 3}
+      propertyPath: m_DebugHorizontalCollisionCast
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6384343835097644696, guid: 1952abc1557af4b44bc45626c631c10b,
         type: 3}
       propertyPath: m_RootOrder
@@ -16334,7 +16354,7 @@ PrefabInstance:
     - target: {fileID: 6384343835097644696, guid: 1952abc1557af4b44bc45626c631c10b,
         type: 3}
       propertyPath: m_LocalPosition.x
-      value: -8.678
+      value: -7.282
       objectReference: {fileID: 0}
     - target: {fileID: 6384343835097644696, guid: 1952abc1557af4b44bc45626c631c10b,
         type: 3}
@@ -16344,7 +16364,7 @@ PrefabInstance:
     - target: {fileID: 6384343835097644696, guid: 1952abc1557af4b44bc45626c631c10b,
         type: 3}
       propertyPath: m_LocalPosition.z
-      value: -16.126
+      value: -17.316
       objectReference: {fileID: 0}
     - target: {fileID: 6384343835097644696, guid: 1952abc1557af4b44bc45626c631c10b,
         type: 3}
