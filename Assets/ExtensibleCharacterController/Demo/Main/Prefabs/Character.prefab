@@ -243,11 +243,12 @@ MonoBehaviour:
   m_Gravity: 9.81
   m_MaxCollisions: 30
   m_MaxOverlapCorrections: 10
+  m_FixCollisionOverlaps: 1
   m_HorizontalCollisionsEnabled: 1
   m_HorizontalFrictionFactor: 1
   m_VerticalCollisionsEnabled: 1
   m_SkinWidth: 0.1
-  m_MaxStep: 0
+  m_MaxStep: 0.3
   m_MaxSlopeAngle: 80
   m_SlopeLeewayAngle: 0.5
   m_TimeScale: 1

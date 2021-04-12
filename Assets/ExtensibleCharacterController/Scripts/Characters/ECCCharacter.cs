@@ -131,6 +131,9 @@ namespace ExtensibleCharacterController.Characters
         private Vector2 m_Input = Vector2.zero;
         private Vector3 m_Motor = Vector3.zero;
 
+        private bool m_CanValidateHorizontalDirection = true;
+        private bool m_CanValidateVerticalDirection = true;
+
         protected override void Initialize()
         {
             m_RaycastHits = new RaycastHit[m_MaxCollisions];
@@ -425,6 +428,7 @@ namespace ExtensibleCharacterController.Characters
 
                 // If the hit point can be stepped over, do not continue. Vertical collision detection will handle the actual step-up logic.
                 bool canStepOver = CanStepOver(hitPoint, horizontalMoveDirection, normalizedHorizontalDirection, horizontalDirectionMagnitude);
+                m_CanValidateHorizontalDirection = !canStepOver; // If a step over happened, ignore horizontal validation this frame.
                 ClearOverlapColliders();
 
                 if (canStepOver) return;
@@ -740,12 +744,12 @@ namespace ExtensibleCharacterController.Characters
 
             // Apply horizontal and/or vertical directions based on enabled status.
             Vector3 targetDirection = Vector3.zero;
-            if (m_HorizontalCollisionsEnabled)
+            if (m_HorizontalCollisionsEnabled && m_CanValidateHorizontalDirection)
             {
                 targetDirection += horizontalDirection;
             }
 
-            if (m_VerticalCollisionsEnabled)
+            if (m_VerticalCollisionsEnabled && m_CanValidateVerticalDirection)
             {
                 targetDirection += verticalDirection;
             }
