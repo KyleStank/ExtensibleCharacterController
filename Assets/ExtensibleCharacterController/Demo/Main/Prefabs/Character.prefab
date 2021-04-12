@@ -241,17 +241,19 @@ MonoBehaviour:
     m_Bits: 2147483648
   m_UseGravity: 0
   m_Gravity: 9.81
-  m_MaxCollisions: 10
-  m_HorizontalSkinWidth: 0.05
+  m_MaxCollisions: 30
+  m_MaxOverlapCorrections: 10
+  m_HorizontalCollisionsEnabled: 1
   m_HorizontalFrictionFactor: 1
+  m_VerticalCollisionsEnabled: 1
   m_SkinWidth: 0.1
-  m_MaxStep: 0.3
+  m_MaxStep: 0
   m_MaxSlopeAngle: 80
   m_SlopeLeewayAngle: 0.5
   m_TimeScale: 1
-  m_DebugHorizontalCollisionCast: 0
+  m_DebugHorizontalCollisionCast: 1
   m_DebugHorizontalWallCast: 0
-  m_DebugHorizontalStepCast: 1
+  m_DebugHorizontalStepCast: 0
   m_DebugMoveDirection: 1
   m_DebugNormalizedMoveDirection: 0
   m_CharacterBehaviourNames:

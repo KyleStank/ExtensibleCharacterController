@@ -38,23 +38,28 @@ namespace ExtensibleCharacterController.Characters
         [Tooltip("Amount of force that is applied to the gravity direction.")]
         [SerializeField]
         private float m_Gravity = -UPhysics.gravity.y;
-        [Tooltip("Maximum amount of collisions that character can detect per frame.")]
+        [Tooltip("Maximum number of collisions that character can detect, per frame.")]
         [SerializeField]
-        private int m_MaxCollisions = 10;
+        private int m_MaxCollisions = 30;
+        [Tooltip("Maximum number of overlapped colliders that character will seperate from, per frame.")]
+        [SerializeField]
+        private int m_MaxOverlapCorrections = 10;
+        [Tooltip("Enable/disable functionality to automatically ensure that the character will seperate itself from overlapping collisions.")]
+        [SerializeField]
+        private bool m_FixCollisionOverlaps = true;
 
         [Header("Horizontal Collision Settings")]
-        [Tooltip(
-            "Distance that is used during horizontal collision detection to prevent the character from clipping through surfaces." + " " +
-            "The higher the value, the farther away the character will be from collision points, and vice-versa." + " " +
-            "The default value should be fine in most scenarios."
-        )]
+        [Tooltip("Enable/disable horizontal collision detection.")]
         [SerializeField]
-        private float m_HorizontalSkinWidth = 0.1f;
+        private bool m_HorizontalCollisionsEnabled = true;
         [Tooltip("Friction multiplier applied to surface sliding.")]
         [SerializeField]
         private float m_HorizontalFrictionFactor = 1.0f;
 
         [Header("Vertical Collision Settings")]
+        [Tooltip("Enable/disable vertical collision detection.")]
+        [SerializeField]
+        private bool m_VerticalCollisionsEnabled = true;
         [Tooltip(
             "Distance that is used during vertical collision detection to detect the ground surface." + " " +
             "The higher the value, the bigger the gap between the character and ground is required before considered grounded, and vice-versa." + " " +
@@ -116,7 +121,7 @@ namespace ExtensibleCharacterController.Characters
         private CapsuleCollider m_Collider = null;
         private RaycastHit[] m_RaycastHits;
         private RaycastHit m_SingleRaycastHit;
-        private Collider[] m_OverlappedColliders;
+        private Collider[] m_OverlappingColliders;
 
         private Vector3 m_MoveDirection = Vector3.zero;
         private Vector3 m_GravityDirection = -Vector3.up;
@@ -129,7 +134,7 @@ namespace ExtensibleCharacterController.Characters
         protected override void Initialize()
         {
             m_RaycastHits = new RaycastHit[m_MaxCollisions];
-            m_OverlappedColliders = new Collider[m_MaxCollisions];
+            m_OverlappingColliders = new Collider[m_MaxCollisions];
 
             // // TODO: Create custom inspector that adds through dropdown rather than manual string type names.
             // // TODO: Create custom inspector to drag and order the priority of each behaviour.
@@ -239,6 +244,9 @@ namespace ExtensibleCharacterController.Characters
             DetectHorizontalCollisions();
             // DetectVerticalCollisions();
 
+            // Perform one last check to make sure character is not overlapping any colliders.
+            ValidateMoveDirection();
+
             // Move character after all calculations are completed.
             // Make sure move direction is multiplied by delta time as the direction vector is too large for per-frame movement.
             if (m_MotorEnabled)
@@ -338,8 +346,10 @@ namespace ExtensibleCharacterController.Characters
         // TODO: https://app.asana.com/0/1200147678177766/1200147678177805
         private void DetectHorizontalCollisions()
         {
+            if (!m_HorizontalCollisionsEnabled) return;
+
             // Turn move direction into horizontal direction only.
-            Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MoveDirection, transform.up);
+            Vector3 horizontalMoveDirection = ConvertToHorizontalDirection(m_MoveDirection);
             Vector3 targetDirection = horizontalMoveDirection;
 
             // If no movement is occuring, no need to check for collisions.
@@ -362,6 +372,46 @@ namespace ExtensibleCharacterController.Characters
                 m_DebugHorizontalCollisionCast
             );
 
+            // // TODO: Re-enable and improve GetClosestRaycastHitRecursive() to support loops and always return the actual nearest hit.
+            // for (int i = 0; i < hitCount; i++)
+            // {
+            //     RaycastHit horizontalHit = ECCPhysicsHelper.GetClosestRaycastHitRecursive(
+            //         m_Collider,
+            //         hitCount,
+            //         m_RaycastHits,
+            //         horizontalMoveDirection,
+            //         COLLIDER_OFFSET
+            //     );
+            //     Vector3 hitPoint = horizontalHit.point;
+
+            //     // If the hit point can be stepped over, do not continue. Vertical collision detection will handle the actual step-up logic.
+            //     bool canStepOver = CanStepOver(hitPoint, horizontalMoveDirection, normalizedHorizontalDirection, horizontalDirectionMagnitude);
+            //     ClearOverlapColliders();
+
+            //     if (canStepOver) continue;
+
+            //     // Create direction that allows character to slide off surfaces by projecting the horizontal direction onto the hit surface.
+            //     // Uses same magnitude as horizontal direction, so make sure to remove horizontal direction before applying target direction.
+            //     Vector3 horizontalNormal = Vector3.ProjectOnPlane(horizontalHit.normal, transform.up);
+            //     Vector3 surfaceDirection = Vector3.ProjectOnPlane(horizontalMoveDirection, horizontalNormal).normalized;
+
+            //     // Calculate the strength of the surface direction based on the direction of the horizontal move direction.
+            //     // The Dot product of the normalized horizontal direction and inverse horizontal normal is perfect, as it uses cosine.
+            //     float surfaceDirectionStrength = 1.0f - Vector3.Dot(normalizedHorizontalDirection, -horizontalNormal);
+
+            //     // If the horizontal magnitude is greater than the radius of the collider, than the collider distance will be used.
+            //     // This will prevent overlap. Collisions behave odd if an object moves more than its radius and has another collision next frame.
+            //     Vector3 colliderPoint = ECCPhysicsHelper.GetClosestColliderPoint(m_Collider, horizontalMoveDirection, hitPoint);
+            //     float colliderDistance = (hitPoint - colliderPoint).magnitude - COLLIDER_OFFSET;
+            //     float surfaceDirectionDistance = Mathf.Min(colliderDistance, horizontalDirectionMagnitude);
+
+            //     // Calculate the target move direction by multiplying the surface direction by all of our factor values.
+            //     targetDirection = surfaceDirection *
+            //         (horizontalDirectionMagnitude - surfaceDirectionDistance) * surfaceDirectionStrength * m_HorizontalFrictionFactor;
+
+            //     ClearRaycasts();
+            // }
+
             if (hitCount > 0)
             {
                 RaycastHit horizontalHit = ECCPhysicsHelper.GetClosestRaycastHitRecursive(
@@ -375,12 +425,14 @@ namespace ExtensibleCharacterController.Characters
 
                 // If the hit point can be stepped over, do not continue. Vertical collision detection will handle the actual step-up logic.
                 bool canStepOver = CanStepOver(hitPoint, horizontalMoveDirection, normalizedHorizontalDirection, horizontalDirectionMagnitude);
+                ClearOverlapColliders();
+
                 if (canStepOver) return;
 
                 // Create direction that allows character to slide off surfaces by projecting the horizontal direction onto the hit surface.
                 // Uses same magnitude as horizontal direction, so make sure to remove horizontal direction before applying target direction.
-                Vector3 horizontalNormal = Vector3.ProjectOnPlane(horizontalHit.normal, transform.up);
-                Vector3 surfaceDirection = Vector3.ProjectOnPlane(horizontalMoveDirection, horizontalNormal).normalized;
+                Vector3 horizontalNormal = ConvertToHorizontalDirection(horizontalHit.normal);
+                Vector3 surfaceDirection = ConvertToHorizontalDirection(horizontalMoveDirection, horizontalNormal).normalized;
 
                 // Calculate the strength of the surface direction based on the direction of the horizontal move direction.
                 // The Dot product of the normalized horizontal direction and inverse horizontal normal is perfect, as it uses cosine.
@@ -491,12 +543,12 @@ namespace ExtensibleCharacterController.Characters
             // The passed in directions must be a horizontal direction.
             if (horizontalMoveDirection.y != 0.0f)
             {
-                horizontalMoveDirection = Vector3.ProjectOnPlane(horizontalMoveDirection, transform.up);
+                horizontalMoveDirection = ConvertToHorizontalDirection(horizontalMoveDirection);
             }
 
             if (castDirection.y != 0.0f)
             {
-                castDirection = Vector3.ProjectOnPlane(castDirection, transform.up);
+                castDirection = ConvertToHorizontalDirection(castDirection);
             }
 
             // Make sure the horizontal magnitude is not null.
@@ -532,7 +584,7 @@ namespace ExtensibleCharacterController.Characters
                 return NonAllocCapsuleOverlap(
                     horizontalMoveDirection + (transform.up * m_MaxStep) + horizontalMoveDirection.normalized
                         * (ECCPhysicsHelper.GetCapsuleRadiusScale(m_Collider) * m_Collider.radius + COLLIDER_OFFSET),
-                    ref m_OverlappedColliders,
+                    ref m_OverlappingColliders,
                     m_DebugHorizontalStepCast
                 ) == 0;
             }
@@ -574,8 +626,10 @@ namespace ExtensibleCharacterController.Characters
         // TODO: https://app.asana.com/0/1200147678177766/1200147678177807
         private void DetectVerticalCollisions()
         {
+            if (!m_VerticalCollisionsEnabled) return;
+
             float originalMoveDistance = m_MoveDirection.magnitude;
-            Vector3 horizontalMoveDirection = Vector3.ProjectOnPlane(m_MoveDirection, -m_GravityDirection);
+            Vector3 horizontalMoveDirection = ConvertToHorizontalDirection(m_MoveDirection, -m_GravityDirection);
             Vector3 targetDirection = Vector3.zero;
 
             // Cast in downward position.
@@ -629,7 +683,7 @@ namespace ExtensibleCharacterController.Characters
                         hitPoint - (horizontalMoveDirection.normalized * COLLIDER_OFFSET),
                         horizontalMoveDirection.normalized,
                         out m_SingleRaycastHit,
-                        m_HorizontalSkinWidth,
+                        COLLIDER_OFFSET,
                         ~m_CollisionIgnoreLayer.value
                     );
                     if (IsValidSlopeAngle(m_SingleRaycastHit.normal))
@@ -638,16 +692,12 @@ namespace ExtensibleCharacterController.Characters
                     }
                 }
 
-                bool overlapped = IsOverlapping(
+                CalculateOverlapCorrection(
                     hit.collider,
                     (horizontalMoveDirection.normalized * COLLIDER_OFFSET) + (transform.up * COLLIDER_OFFSET),
-                    out Vector3 dir,
-                    out float dis
+                    out Vector3 dir
                 );
-                if (overlapped)
-                {
-                    targetDirection.y += dir.y;
-                }
+                targetDirection.y += dir.y;
             }
             else
             {
@@ -662,30 +712,89 @@ namespace ExtensibleCharacterController.Characters
 
         #endregion
 
+        #region Move Direction Correction
+
+        // Checks for any overlapping colliders and adjusts accordingly. Should be invoked after all final move direction has been calculated.
+        private void ValidateMoveDirection()
+        {
+            if (!m_FixCollisionOverlaps || (!m_HorizontalCollisionsEnabled && !m_VerticalCollisionsEnabled)) return;
+
+            int overlapCount = NonAllocCapsuleOverlap(
+                m_MoveDirection,
+                ref m_OverlappingColliders,
+                true
+            );
+
+            // Calculate direction character must move to seperate from all overlapped colliders.
+            Vector3 direction = Vector3.zero;
+            Vector3 correctionDirection = Vector3.zero;
+            for (int i = 0; i < overlapCount; i++)
+            {
+                CalculateOverlapCorrection(m_OverlappingColliders[i], m_MoveDirection, out direction);
+                correctionDirection += direction;
+            }
+
+            // Seperate vertical and horizontal directions.
+            Vector3 horizontalDirection = ConvertToHorizontalDirection(correctionDirection);
+            Vector3 verticalDirection = ConvertToVerticalDirection(correctionDirection);
+
+            // Apply horizontal and/or vertical directions based on enabled status.
+            Vector3 targetDirection = Vector3.zero;
+            if (m_HorizontalCollisionsEnabled)
+            {
+                targetDirection += horizontalDirection;
+            }
+
+            if (m_VerticalCollisionsEnabled)
+            {
+                targetDirection += verticalDirection;
+            }
+
+            // Apply current direction magnitude to keep speed while correcting direction.
+            float magnitude = Mathf.Max(m_MoveDirection.magnitude, targetDirection.magnitude);
+            m_MoveDirection = (targetDirection + m_MoveDirection).normalized * magnitude;
+        }
+
+        #endregion
+
+        #region Math Helpers
+
+        // Converts a direction to a horizontal (X & Z only) direction.
+        private Vector3 ConvertToHorizontalDirection(Vector3 direction, Vector3? upNormal = null)
+        {
+            return Vector3.ProjectOnPlane(direction, upNormal != null ? (Vector3)upNormal : transform.up);
+        }
+
+        // Converts a direction to a vertical (Y only) direction.
+        private Vector3 ConvertToVerticalDirection(Vector3 direction, Vector3? forwardNormal = null, Vector3? rightNormal = null)
+        {
+            return Vector3.ProjectOnPlane(
+                Vector3.ProjectOnPlane(direction, forwardNormal != null ? (Vector3)forwardNormal : transform.forward),
+                rightNormal != null ? (Vector3)rightNormal : transform.right
+            );
+        }
+
+        #endregion
+
         #region Collision Helpers
 
-        private bool IsOverlapping(Collider collider, Vector3 offset, out Vector3 direction, out float distance)
+        private void CalculateOverlapCorrection(Collider collider, Vector3 offset, out Vector3 direction)
         {
-            float capsuleRadius = m_Collider.radius;
-            float radiusMultiplier = ECCPhysicsHelper.GetCapsuleRadiusScale(m_Collider);
-            float overlapRadius = (capsuleRadius * radiusMultiplier) + COLLIDER_OFFSET;
+            float radius = (m_Collider.radius * ECCPhysicsHelper.GetCapsuleRadiusScale(m_Collider)) + COLLIDER_OFFSET;
 
             // Set radius of capsule to account for scale and small offset.
-            m_Collider.radius = overlapRadius;
-            bool overlapped = UPhysics.ComputePenetration(
+            m_Collider.radius += radius;
+            if (UPhysics.ComputePenetration(
                 m_Collider, m_Collider.transform.position + offset, m_Collider.transform.rotation,
                 collider, collider.transform.position, collider.transform.rotation,
-                out direction, out distance
-            );
-            if (overlapped)
+                out direction, out float distance
+            ))
             {
                 direction = direction.normalized * (distance + COLLIDER_OFFSET);
             }
 
             // Reset radius.
-            m_Collider.radius = capsuleRadius;
-
-            return overlapped;
+            m_Collider.radius -= radius;
         }
 
         // Peforms a raycast that returns true when any one collider is hit; otherwise, returns false.
@@ -791,6 +900,14 @@ namespace ExtensibleCharacterController.Characters
             for (int i = 0; i < m_RaycastHits.Length; i++)
             {
                 m_RaycastHits[i] = default(RaycastHit);
+            }
+        }
+
+        private void ClearOverlapColliders()
+        {
+            for (int i = 0; i < m_OverlappingColliders.Length; i++)
+            {
+                m_OverlappingColliders[i] = null;
             }
         }
 
