@@ -315,7 +315,7 @@ namespace ExtensibleCharacterController.Characters
         // // Only works for ground surfaces.
         // private Vector3 CreateSlopeDirection(Vector3 horizontalMoveDirection, Vector3 hitNormal)
         // {
-        //     if (!IsWalkableNormal(hitNormal)) return Vector3.zero;
+        //     if (!IsValidSlopeAngle(hitNormal)) return Vector3.zero;
 
         //     // Creates an up direction normal based on the hit normal and the right direction.
         //     // Using the right direction affects the upNormal by rotation, which is useful for the forward direction below.
@@ -329,13 +329,6 @@ namespace ExtensibleCharacterController.Characters
         //     ).normalized * horizontalMoveDirection.magnitude;
 
         //     return forwardDirection - horizontalMoveDirection;
-        // }
-
-        // private bool IsWalkableNormal(Vector3 normal)
-        // {
-        //     // Calculate angle of slope based on normal.
-        //     float angle = Vector3.Angle(normal, transform.up);
-        //     return angle < m_MaxSlopeAngle + m_SlopeLeewayAngle;
         // }
 
         #endregion
@@ -461,8 +454,7 @@ namespace ExtensibleCharacterController.Characters
                 //     //     {
                 //     //         Debug.Break();
                 //     //     }
-                //     //     // float slopeAngle = Vector3.Angle(m_SingleRaycastHit.normal, transform.up);
-                //     //     // if (slopeAngle <= m_MaxSlopeAngle + m_SlopeLeewayAngle) return;
+                //     //     // if (IsValidSlopeAngle(m_SingleRaycastHit.normal)) return;
                 //     // }
 
                 //     // // Find actual distance from skin width. Then apply the difference. Allows character to get as close to surface as possible.
@@ -499,13 +491,11 @@ namespace ExtensibleCharacterController.Characters
             // The passed in directions must be a horizontal direction.
             if (horizontalMoveDirection.y != 0.0f)
             {
-                Debug.Log("Convert Horizontal Move Direction.");
                 horizontalMoveDirection = Vector3.ProjectOnPlane(horizontalMoveDirection, transform.up);
             }
 
             if (castDirection.y != 0.0f)
             {
-                Debug.Log("Convert Cast Direction.");
                 castDirection = Vector3.ProjectOnPlane(castDirection, transform.up);
             }
 
@@ -516,19 +506,10 @@ namespace ExtensibleCharacterController.Characters
             Vector3 localPoint = transform.InverseTransformPoint(point);
             if (localPoint.y <= m_MaxStep + COLLIDER_OFFSET)
             {
-                // Do a raycast that is slightly offset from the hit point.
-                // This will get the true normal, whichs allow us to check the true angle of the point.
-                Vector3 slopeCheckOrigin = point - (horizontalMoveDirection * COLLIDER_OFFSET);
-                SimpleRaycast(
-                    slopeCheckOrigin,
-                    castDirection,
-                    out m_SingleRaycastHit,
-                    STEP_CHECK_OFFSET
-                );
-
-                // If the hit angle is less than the maximum slope angle, then we can step over.
-                float slopeAngle = Vector3.Angle(m_SingleRaycastHit.normal, transform.up);
-                if (slopeAngle <= m_MaxSlopeAngle + m_SlopeLeewayAngle) return true;
+                // Check if the point is on a valid slope angle.
+                float maxDistance = STEP_CHECK_OFFSET + COLLIDER_OFFSET;
+                Vector3 origin = point - (horizontalMoveDirection * STEP_CHECK_OFFSET);
+                if (RaycastForValidSlope(origin, castDirection, maxDistance)) return true;
 
                 // Do another capsule cast that is vertically offset by the step height and check for slope one last time.
                 if (SimpleCapsuleCast(
@@ -541,23 +522,49 @@ namespace ExtensibleCharacterController.Characters
                     // Make sure distance is within magnitude of move direction. Otherwise, next frame or two can handle this.
                     if (m_SingleRaycastHit.distance - COLLIDER_OFFSET < (float)horizontalMagnitude)
                     {
-                        SimpleRaycast(
-                            slopeCheckOrigin,
-                            castDirection,
-                            out m_SingleRaycastHit,
-                            STEP_CHECK_OFFSET
-                        );
-
-                        slopeAngle = Vector3.Angle(m_SingleRaycastHit.normal, transform.up);
-                        if (slopeAngle <= m_MaxSlopeAngle + m_SlopeLeewayAngle) return true;
+                        // Once again, check if the point is on a valid slope angle.
+                        if (RaycastForValidSlope(origin, castDirection, maxDistance)) return true;
                     }
                 }
 
-                // If we have gotten this far, we can step over because than the point is not on a slope and is simply lower than the step height.
-                return true;
+                // Perform an overlap test that is vertically offset by the step height and offseted in the horizontal direction times the radius.
+                // If nothing is overlapping, then we can step over.
+                return NonAllocCapsuleOverlap(
+                    horizontalMoveDirection + (transform.up * m_MaxStep) + horizontalMoveDirection.normalized
+                        * (ECCPhysicsHelper.GetCapsuleRadiusScale(m_Collider) * m_Collider.radius + COLLIDER_OFFSET),
+                    ref m_OverlappedColliders,
+                    m_DebugHorizontalStepCast
+                ) == 0;
             }
 
             return false;
+        }
+
+        // Performs a raycast from an origin in a direction and then checks the slope angle.
+        // If the angle is less than the maximum slope angle, returns true. Otherwise, returns false.
+        private bool RaycastForValidSlope(Vector3 origin, Vector3 direction, float? maxDistance = null)
+        {
+            SimpleRaycast(
+                origin,
+                direction,
+                out m_SingleRaycastHit,
+                maxDistance != null ? (float)maxDistance : direction.magnitude
+            );
+
+            return IsValidSlopeAngle(m_SingleRaycastHit.normal);
+        }
+
+        // Returns true if the normal angle is less than the maximum slope angle. Otherwise, returns false.
+        private bool IsValidSlopeAngle(Vector3 normal)
+        {
+            float angle = Vector3.Angle(normal, transform.up);
+            return IsValidSlopeAngle(angle);
+        }
+
+        // Returns true if the provided angle is less than the maximum slope angle. Otherwise, return false.
+        private bool IsValidSlopeAngle(float angle)
+        {
+            return angle <= m_MaxSlopeAngle + m_SlopeLeewayAngle;
         }
 
         #endregion
@@ -591,9 +598,8 @@ namespace ExtensibleCharacterController.Characters
                     COLLIDER_OFFSET
                 );
 
-                // If slope is too high, do not continue.
-                float slopeAngle = Vector3.Angle(hit.normal, transform.up);
-                if (slopeAngle >= m_MaxSlopeAngle + m_SlopeLeewayAngle) return;
+                // If slope is invalid, do not continue.
+                if (!IsValidSlopeAngle(hit.normal)) return;
 
                 // Vector3 hitPoint = hit.point + (hit.normal * COLLIDER_OFFSET);
                 Vector3 hitPoint = hit.point + (hit.normal * COLLIDER_OFFSET);
@@ -626,8 +632,7 @@ namespace ExtensibleCharacterController.Characters
                         m_HorizontalSkinWidth,
                         ~m_CollisionIgnoreLayer.value
                     );
-                    float angle = Vector3.Angle(m_SingleRaycastHit.normal, transform.up);
-                    if (slopeAngle <= m_MaxSlopeAngle + m_SlopeLeewayAngle)
+                    if (IsValidSlopeAngle(m_SingleRaycastHit.normal))
                     {
                         targetDirection.y = 0.0f;
                     }
