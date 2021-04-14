@@ -15,14 +15,14 @@ namespace ExtensibleCharacterController.Core.Utility
     [DefaultExecutionOrder(-1)]
     public abstract class ECCSingleton<T> : ECCBehaviour where T : ECCBehaviour
     {
-        private static string m_TypeName
+        protected static string m_TypeName
         {
             get { return typeof(T).Name; }
         }
 
-        private static bool m_ShuttingDown = false;
-        private static readonly object m_Lock = new object();
-        private static T m_Instance = null;
+        protected static bool m_ShuttingDown = false;
+        protected static readonly object m_Lock = new object();
+        protected static T m_Instance = null;
         public static T Instance
         {
             get
