@@ -1,6 +1,9 @@
 using UnityEngine;
 using UPhysics = UnityEngine.Physics;
 
+using RotaryHeart.Lib.PhysicsExtension;
+using RotaryPhysics = RotaryHeart.Lib.PhysicsExtension.Physics;
+
 namespace ExtensibleCharacterController.Core.Utility
 {
     /// <summary>
@@ -18,17 +21,16 @@ namespace ExtensibleCharacterController.Core.Utility
         /// <param name="center">Outputted center position of CapsuleCollider.</param>
         /// <param name="start">Outputted start end cap of CapsuleCollider.</param>
         /// <param name="end">Outputted end end cap of CapsuleCollider.</param>
-        /// <param name="height">Optional height that will be used instead of the CapsuleCollider's height.</param>
-        /// <param name="radius">Optional radius that will be used instead of the CapsuleCollider's radius.</param>
+        /// <param name="extraRadius">Optional offset that will be added to the CapsuleCollider's radius value during calculations.</param>
+        /// <param name="extraHeight">Optional offset that will be added to the CapsuleCollider's height value during calculations.</param>
         public static void CalculateCapsuleCaps(
             CapsuleCollider collider,
             Vector3 position,
             Quaternion rotation,
-            out Vector3 center,
             out Vector3 start,
             out Vector3 end,
-            float? height = null,
-            float? radius = null
+            float extraRadius = 0.0f,
+            float extraHeight = 0.0f
         )
         {
             Vector3 direction = GetCapsuleDirection(collider);
@@ -36,36 +38,11 @@ namespace ExtensibleCharacterController.Core.Utility
             float radiusScale = GetCapsuleRadiusScale(collider);
 
             float capAdjustment =
-                ((height != null ? (float)height : collider.height) / 2.0f * heightScale) -
-                ((radius != null ? (float)radius : collider.radius) * radiusScale);
-            center = ECCMathHelper.TransformPoint(position, rotation, Vector3.Scale(collider.center, collider.transform.lossyScale));
+                ((collider.height + (float)extraHeight) / 2.0f * heightScale) -
+                ((collider.radius + (float)extraRadius) * radiusScale);
+            Vector3 center = ECCMathHelper.TransformPoint(position, rotation, Vector3.Scale(collider.center, collider.transform.lossyScale));
             start = center - (direction * capAdjustment);
             end = center + (direction * capAdjustment);
-        }
-
-        /// <summary>
-        /// Calculates the start and end cap values required for a CapsuleCast.
-        /// Outputs both cap values of the capsule.
-        /// </summary>
-        /// <param name="collider">CapsuleCollider to calculate from.</param>
-        /// <param name="position">Position of CapsuleCollider.</param>
-        /// <param name="rotation">Rotation of CapsuleCollider.</param>
-        /// <param name="start">Outputted start end cap of CapsuleCollider.</param>
-        /// <param name="end">Outputted end end cap of CapsuleCollider.</param>
-        /// <param name="height">Optional height that will be used instead of the CapsuleCollider's height.</param>
-        /// /// <param name="radius">Optional radius that will be used instead of the CapsuleCollider's radius.</param>
-        public static void CalculateCapsuleCaps(
-            CapsuleCollider collider,
-            Vector3 position,
-            Quaternion rotation,
-            out Vector3 start,
-            out Vector3 end,
-            float? height = null,
-            float? radius = null
-        )
-        {
-            Vector3 center;
-            CalculateCapsuleCaps(collider, position, rotation, out center, out start, out end, height, radius);
         }
 
         /// <summary>
@@ -117,6 +94,35 @@ namespace ExtensibleCharacterController.Core.Utility
                 return Mathf.Max(collider.transform.lossyScale.x, collider.transform.lossyScale.z);
 
             return Mathf.Max(collider.transform.lossyScale.x, collider.transform.lossyScale.y);
+        }
+
+        public static int CapsuleCastNonAlloc(
+            CapsuleCollider collider,
+            RaycastHit[] hits,
+            Vector3 position,
+            Quaternion rotation,
+            Vector3 direction,
+            float distance,
+            LayerMask layerMask,
+            float sizeAdjustment = 0.0f,
+            bool debug = false
+        )
+        {
+            CalculateCapsuleCaps(collider, position, rotation, out Vector3 capStart, out Vector3 capEnd, sizeAdjustment, sizeAdjustment);
+            return RotaryPhysics.CapsuleCastNonAlloc(
+                capStart,
+                capEnd,
+                collider.radius + sizeAdjustment,
+                direction,
+                hits,
+                distance,
+                layerMask.value,
+                QueryTriggerInteraction.Ignore,
+                debug && Application.isEditor ? PreviewCondition.Both : PreviewCondition.None,
+                0.0f,
+                Color.red,
+                Color.green
+            );
         }
 
         /// <summary>
