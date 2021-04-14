@@ -86,10 +86,10 @@ namespace ExtensibleCharacterController.Characters
         [Tooltip("Change the global time scale. Useful for slowly visualizing changes to a fast character.")]
         [SerializeField]
         private float m_TimeScale = 1.0f;
-        [Tooltip("Visually indicates the primary horizontal collision test. Drawn in the Editor and at Runtime.")]
+        [Tooltip("Visually indicates the primary horizontal collision test.")]
         [SerializeField]
         private bool m_DebugHorizontalCollisionCast = false;
-        [Tooltip("Visually indicates the horizontal collision test that happens when sliding on a surface. Drawn in the Editor and at Runtime.")]
+        [Tooltip("Visually indicates the horizontal collision test that happens when sliding on a surface.")]
         [SerializeField]
         private bool m_DebugHorizontalWallCast = false;
         [Tooltip("Draws the casts/overlap checks that occur when checking for steps/slopes during horizontal collision detection.")]
@@ -807,7 +807,7 @@ namespace ExtensibleCharacterController.Characters
                 out raycastHit,
                 distance,
                 ~m_CollisionIgnoreLayer.value,
-                debugDraw ? PreviewCondition.Both : PreviewCondition.None,
+                debugDraw && Application.isEditor ? PreviewCondition.Both : PreviewCondition.None,
                 0.0f,
                 Color.red,
                 Color.green
@@ -835,7 +835,7 @@ namespace ExtensibleCharacterController.Characters
                 hits,
                 direction.magnitude,
                 ~m_CollisionIgnoreLayer.value,
-                debugDraw ? PreviewCondition.Both : PreviewCondition.None,
+                debugDraw && Application.isEditor ? PreviewCondition.Both : PreviewCondition.None,
                 0.0f,
                 Color.red,
                 Color.green
@@ -863,7 +863,7 @@ namespace ExtensibleCharacterController.Characters
                 out raycastHit,
                 direction.magnitude,
                 ~m_CollisionIgnoreLayer.value,
-                debugDraw ? PreviewCondition.Both : PreviewCondition.None,
+                debugDraw && Application.isEditor ? PreviewCondition.Both : PreviewCondition.None,
                 0.0f,
                 Color.red,
                 Color.green
@@ -889,7 +889,7 @@ namespace ExtensibleCharacterController.Characters
                 radius,
                 colliders,
                 ~m_CollisionIgnoreLayer.value,
-                debugDraw ? PreviewCondition.Both : PreviewCondition.None,
+                debugDraw && Application.isEditor ? PreviewCondition.Both : PreviewCondition.None,
                 0.0f,
                 Color.red,
                 Color.green
